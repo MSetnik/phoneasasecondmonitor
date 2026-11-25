@@ -40,7 +40,9 @@ try {
   Write-Host "::notice::The installed adapter reports INF '$inf', provider '$provider' and status '$($device.Status)'."
   if($inf -notmatch '^oem[0-9]+\.inf$' -or $provider -ne 'MikeTheTech'){throw "The registered adapter is not bound to the expected virtual display package (INF '$inf', provider '$provider')."}
   $driver=Get-WindowsDriver -Online -Driver $inf
-  $store=Split-Path $driver.OriginalFileName
+  $stores=@($driver | ForEach-Object {Split-Path $_.OriginalFileName} | Select-Object -Unique)
+  if($stores.Count -ne 1){throw "Unexpected number of driver-store packages for $inf."}
+  $store=$stores[0]
   foreach($file in @('mttvdd.cat','MttVDD.dll','MttVDD.inf')){
     if((Get-FileHash "$store/$file").Hash -ne (Get-FileHash "$app/driver/$file").Hash){throw "Installed driver store file differs from the pinned upstream package: $file"}
   }
