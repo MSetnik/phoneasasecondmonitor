@@ -49,13 +49,9 @@ try {
   $signature=Get-AuthenticodeSignature "$store/mttvdd.cat"
   if($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*SignPath Foundation*'){throw "The installed driver catalog is not valid: $($signature.Status)."}
   Write-Host '::notice::Verified the running adapter, installed driver files and SignPath catalog in the Windows driver store.'
-  $result='{"id":1,"op":"check"}' | & "$app\resources\MonitorHost.exe"
-  $helperExit=$LASTEXITCODE
-  $reply=$result | Select-Object -First 1 | ConvertFrom-Json
-  if($helperExit -ne 0 -or !$reply -or ($reply.PSObject.Properties.Name -notcontains 'result')){
-    throw "Display helper check failed (exit $helperExit). Response: $($result -join ' ')"
-  }
-  Write-Host '::notice::The installed display helper answered its first native request.'
+  $output=node windows/tests/bridge.cjs "$app/resources/MonitorHost.exe" 2>&1
+  if($LASTEXITCODE){throw "Display helper IPC: $($output -join ' ')"}
+  Write-Host '::notice::The installed display helper answered the same Node IPC calls used by the tray app.'
   if ($env:PASM_TEST_DESKTOP -eq '1') {
     npm ci --prefix windows/tests --ignore-scripts --no-audit --no-fund
     if ($LASTEXITCODE) {throw 'Desktop test dependency installation failed.'}
