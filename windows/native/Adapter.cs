@@ -23,7 +23,46 @@ internal static class Adapter {
         if(CM_Get_DevNode_Status(out status,out problem,device,0)!=0 || (status&8)==0 || problem!=0)
             throw new Exception("Windows has not started the monitor driver (device code "+problem+"). Check Device Manager, or repair the installation.");
     }
-    internal static void Install(bool remove) {
+    [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]
+    struct InstallParams {
+        public int size,flags,flagsEx;
+        public IntPtr hwnd,callback,context,queue,classReserved;
+        public int reserved;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=260)] public string driverPath;
+    }
+    [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]
+    struct DriverInfo {
+        public int size,type;
+        public UIntPtr reserved;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=256)] public string description;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=256)] public string manufacturer;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=256)] public string provider;
+        public System.Runtime.InteropServices.ComTypes.FILETIME date;
+        public ulong version;
+    }
+    [DllImport("setupapi",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool SetupDiGetDeviceInstallParams(IntPtr list,ref Device device,ref InstallParams parameters);
+    [DllImport("setupapi",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool SetupDiSetDeviceInstallParams(IntPtr list,ref Device device,ref InstallParams parameters);
+    [DllImport("setupapi",SetLastError=true)] static extern bool SetupDiBuildDriverInfoList(IntPtr list,ref Device device,uint type);
+    [DllImport("setupapi",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool SetupDiEnumDriverInfo(IntPtr list,ref Device device,uint type,uint index,ref DriverInfo driver);
+    [DllImport("setupapi")] static extern bool SetupDiDestroyDriverInfoList(IntPtr list,ref Device device,uint type);
+    [DllImport("newdev",SetLastError=true)] static extern bool DiInstallDevice(IntPtr hwnd,IntPtr list,ref Device device,ref DriverInfo driver,uint flags,out bool reboot);
+    static bool BindPackage(IntPtr list,ref Device device) {
+        var options=new InstallParams{size=Marshal.SizeOf(typeof(InstallParams))};
+        if(!SetupDiGetDeviceInstallParams(list,ref device,ref options))throw new System.ComponentModel.Win32Exception();
+        options.flags|=0x10000; // DI_ENUMSINGLEINF: limit selection to the bundled INF.
+        options.driverPath=System.IO.Path.GetFullPath(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory,@"..\driver\MttVDD.inf"));
+        if(!SetupDiSetDeviceInstallParams(list,ref device,ref options) || !SetupDiBuildDriverInfoList(list,ref device,2))
+            throw new System.ComponentModel.Win32Exception();
+        try{
+            var driver=new DriverInfo{size=Marshal.SizeOf(typeof(DriverInfo))};
+            if(!SetupDiEnumDriverInfo(list,ref device,2,0,ref driver))throw new System.ComponentModel.Win32Exception();
+            if(driver.provider!="MikeTheTech")throw new Exception("Unexpected display driver provider.");
+            bool reboot;
+            if(!DiInstallDevice(IntPtr.Zero,list,ref device,ref driver,0,out reboot))throw new System.ComponentModel.Win32Exception();
+            return reboot;
+        }finally{SetupDiDestroyDriverInfoList(list,ref device,2);}
+    }
+    internal static bool Install(bool remove) {
         IntPtr list = SetupDiCreateDeviceInfoList(ref display, IntPtr.Zero);
         if (list == new IntPtr(-1)) throw new System.ComponentModel.Win32Exception();
         try {
@@ -31,13 +70,15 @@ internal static class Adapter {
             bool exists = SetupDiOpenDeviceInfo(list,Instance,IntPtr.Zero,0,ref device);
             if (remove) {
                 if (exists && !SetupDiCallClassInstaller(5,list,ref device)) throw new System.ComponentModel.Win32Exception();
-                return;
+                return false;
             }
-            if (exists) return;
+            if(!exists){
             byte[] ids = Encoding.Unicode.GetBytes("MttVDD\0\0");
             if (!SetupDiCreateDeviceInfo(list,Instance,ref display,"Phone as a Second Monitor",IntPtr.Zero,0,ref device)
                 || !SetupDiSetDeviceRegistryProperty(list,ref device,1,ids,ids.Length)
                 || !SetupDiCallClassInstaller(0x19,list,ref device)) throw new System.ComponentModel.Win32Exception();
+            }
+            return BindPackage(list,ref device);
         } finally { SetupDiDestroyDeviceInfoList(list); }
     }
 

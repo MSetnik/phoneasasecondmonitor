@@ -103,7 +103,7 @@ internal static class Host {
     [STAThread] static int Main(string[] args){
         SetProcessDpiAwarenessContext(new IntPtr(-4));
         try{
-            if(args.Length==1 && (args[0]=="install"||args[0]=="uninstall")){Adapter.Install(args[0]=="uninstall");return 0;}
+            if(args.Length==1 && (args[0]=="install"||args[0]=="uninstall")){return Adapter.Install(args[0]=="uninstall")?3010:0;}
             Console.InputEncoding=new System.Text.UTF8Encoding(false);Console.OutputEncoding=new System.Text.UTF8Encoding(false);
             string line;
             while((line=Console.ReadLine())!=null){

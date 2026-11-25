@@ -60,9 +60,11 @@ Section
   ${EndIf}
   nsExec::ExecToLog '"$INSTDIR\resources\MonitorHost.exe" install'
   Pop $0
-  ${If} $0 != 0
+  ${If} $0 == 3010
+    SetRebootFlag true
+  ${ElseIf} $0 != 0
     SetErrorLevel 1
-    Abort "Windows could not create the virtual monitor."
+    Abort "Windows could not bind the driver to the virtual monitor."
   ${EndIf}
   nsExec::ExecToLog '"$SYSDIR\netsh.exe" advfirewall firewall delete rule name="MCODE Phone as a Second Monitor" program="$INSTDIR\PhoneAsMonitor.exe"'
   Pop $0
