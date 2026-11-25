@@ -68,15 +68,17 @@ try {
     if ($LASTEXITCODE) {throw 'Desktop test dependency installation failed.'}
     if ($env:GITHUB_ACTIONS -eq 'true' -and $env:PASM_RUNNER_KIND -eq 'github-hosted') {
       $compiler="$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-      & $compiler /nologo /platform:x64 /out:dist\ProjectionTest.exe /reference:System.Windows.Forms.dll,System.Drawing.dll windows/tests/Projection.cs windows/native/Adapter.cs windows/native/SwipeWheel.cs
-      if ($LASTEXITCODE) {throw 'Could not compile the projection regression test.'}
-      $projection= & dist/ProjectionTest.exe prepare-desktop 2>&1
+      $refs="${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
+      $libs='mscorlib.dll,System.dll,System.Core.dll,System.Windows.Forms.dll,System.Drawing.dll'
+      $compile= & $compiler /nologo /noconfig /nostdlib+ /platform:x64 /out:dist\ProjectionTest.exe "/lib:$refs" "/reference:$libs" windows\tests\Projection.cs windows\native\Adapter.cs windows\native\SwipeWheel.cs 2>&1
+      if ($LASTEXITCODE) {throw "Projection test compilation failed. $($compile -join ' ')"}
+      $projection= & .\dist\ProjectionTest.exe prepare-desktop 2>&1
       if ($LASTEXITCODE) {throw "Could not stage the projection test. $($projection -join ' ')"}
       Write-Host "::notice::$($projection -join ' ')"
     }
     $lines = node windows/tests/display.cjs 2>&1
     if ($LASTEXITCODE) {throw ("Extended desktop test: " + ($lines -join ' '))}
-    Write-Host $lines
+    Write-Host "::notice::$($lines -join ' | ')"
   }
 }catch{
   $failure=$_

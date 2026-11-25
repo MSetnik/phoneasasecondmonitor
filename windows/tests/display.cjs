@@ -22,10 +22,12 @@ async function checkTouchScroll(host,phone){
     }
     await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     await session.detach();
-    let scroll=0;
-    for(let i=0;i<30 && scroll<60;i++){
+    let scroll=0, settled=0;
+    for(let i=0;i<35 && settled<3;i++){
       await new Promise(r=>setTimeout(r,100));
-      scroll=await host.evaluate(()=>global.scrollTestWindow.webContents.executeJavaScript('window.scrollY'));
+      const position=await host.evaluate(()=>global.scrollTestWindow.webContents.executeJavaScript('window.scrollY'));
+      settled=position>0 && position===scroll?settled+1:0;
+      scroll=position;
     }
     assert.ok(scroll>=60,'A 72 CSS pixel swipe moved the Windows page only '+scroll+' CSS pixels.');
     console.log('A 72 CSS pixel touchscreen swipe scrolled the page on the extended Windows desktop by '+scroll+' CSS pixels.');
