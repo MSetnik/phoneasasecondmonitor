@@ -58,6 +58,8 @@ def main():
                 info=plistlib.loads(z.read('Phone as a Second Monitor.app/Contents/Info.plist'))
             if info.get('CFBundleIdentifier')!='com.mcode.phoneasmonitor.direct' or info.get('SUPublicEDKey')!=PUBLIC_KEY:
                 parser.error('Select the direct macOS release with the correct update key.')
+            if not (info.get('SURequireSignedFeed') is True and info.get('SUVerifyUpdateBeforeExtraction') is True):
+                parser.error('Sparkle needs both signed-feed and pre-extraction verification enabled.')
             build=info['CFBundleVersion']
             version=info['CFBundleShortVersionString']
             url=f'{BASE}/macos/{digest}/Phone-as-a-Second-Monitor.zip'
