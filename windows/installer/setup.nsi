@@ -15,11 +15,11 @@ SetCompressor lzma
 Icon "..\..\out\monitor.ico"
 UninstallIcon "..\..\out\monitor.ico"
 ShowInstDetails show
-VIProductVersion "1.0.5.0"
+VIProductVersion "1.0.6.0"
 VIAddVersionKey /LANG=1033 "ProductName" "Phone as a Second Monitor"
 VIAddVersionKey /LANG=1033 "CompanyName" "MCODE"
 VIAddVersionKey /LANG=1033 "FileDescription" "Windows x64 installer"
-VIAddVersionKey /LANG=1033 "FileVersion" "1.0.5"
+VIAddVersionKey /LANG=1033 "FileVersion" "1.0.6"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "MCODE"
 !define MUI_WELCOMEPAGE_TEXT "Setup installs the Windows app and the virtual display driver that creates your second monitor. Windows may ask you to approve the signed driver. The app can connect to phones on your private local network. You approve each device before it can see the display."
 !define MUI_FINISHPAGE_TEXT "Open Phone as a Second Monitor from Start to pair your phone. Use the same private Wi-Fi network on both devices."
@@ -44,7 +44,7 @@ Section
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKLM "${APPKEY}" "DisplayName" "Phone as a Second Monitor"
   WriteRegStr HKLM "${APPKEY}" "Publisher" "MCODE"
-  WriteRegStr HKLM "${APPKEY}" "DisplayVersion" "1.0.5"
+  WriteRegStr HKLM "${APPKEY}" "DisplayVersion" "1.0.6"
   WriteRegStr HKLM "${APPKEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegStr HKLM "${APPKEY}" "DisplayIcon" "$INSTDIR\monitor.ico"
   ${DisableX64FSRedirection}

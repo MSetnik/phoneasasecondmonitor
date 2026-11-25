@@ -1,6 +1,21 @@
 'use strict';
 const el=id=>document.getElementById(id);
+function renderUpdate(u,busy){
+ const phase=u?.phase||'idle';
+ el('updatePanel').hidden=phase==='idle';
+ if(phase==='idle')return;
+ const actionable=['available','ready','error'].includes(phase)&&!!u.version;
+ el('updateTitle').textContent=u.version?'Update available · '+u.version:'Software update';
+ el('updateNotes').textContent=u.notes||'';
+ el('updateStatus').textContent=actionable&&busy?'Finish your current session to install the update.':u.message||'';
+ el('installUpdate').hidden=!actionable;el('installUpdate').disabled=busy;
+ el('retryUpdate').hidden=phase!=='error'||actionable;
+ el('laterUpdate').hidden=['checking','downloading','launching'].includes(phase);
+ el('laterUpdate').textContent=actionable?'Later':'Close';
+ el('updateProgress').hidden=phase!=='downloading';el('updateProgress').value=u.percent||0;
+}
 function render(s){
+ renderUpdate(s.update,s.updateBusy);
  if((s.requestID||'')!==el('approval').dataset.requestId){
    el('approval').dataset.requestId=s.requestID||'';
    el('controls').checked=s.preferredTouch===true;

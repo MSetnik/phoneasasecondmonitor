@@ -79,6 +79,7 @@ class Sharing {
     if(this.remaining()===0)return reply(402,'Your free demo has ended. Open the Windows app to continue.');
     const ip=req.socket.remoteAddress;
     if(method==='POST'&&route==='/pair'){
+      if(this.installingUpdate?.())return reply(503,'Windows is opening an update. Reconnect after installation.');
       if(this.peer)return reply(409,'A device is already pairing or connected.');
       if(this.failures.length>=8)return reply(429,'Too many attempts. Try again in one minute.');
       if(h['x-pair-code']!==this.code){this.failures.push(Date.now());return reply(403,'Check the code on your PC.');}

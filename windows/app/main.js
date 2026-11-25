@@ -3,8 +3,9 @@ const {app,BrowserWindow,Tray,Menu,screen,desktopCapturer,ipcMain,safeStorage,cl
 const os=require('node:os'),fs=require('node:fs'),path=require('node:path');
 const QR=require('qrcode');
 const {Sharing}=require('./server'),{Native}=require('./bridge'),{License}=require('./license');
+const {Updates}=require('./updates');
 const title='Phone as a Second Monitor';
-let ui,worker,tray,server,native,license,settings,prefs,viewer,qr='',notice='',address='',blocker;
+let updates,ui,worker,tray,server,native,license,settings,prefs,viewer,qr='',notice='',address='',blocker;
 let lastPeer=null,expired=false,quitting=false,mediaID=0,chain=Promise.resolve(),opening=false,checkout,checkingTopology=false;
 const calls=new Map();
 const scrollSpeeds=[96,48,24];
@@ -17,9 +18,10 @@ function show(){if(ui){ui.show();ui.focus();}}
 function save(){fs.writeFileSync(prefs+'.tmp',JSON.stringify(settings));fs.renameSync(prefs+'.tmp',prefs);}
 function networks(){return [...new Set(Object.values(os.networkInterfaces()).flat().filter(n=>n && n.family==='IPv4' && !n.internal && !n.address.startsWith('169.254.')).map(n=>n.address))];}
 function state(){const p=server?.peer;return {ready:!!address,ips:networks(),address,qr,code:server?.code,phase:p?.error?'failed':p?.delivered?'live':p?.approved?'preparing':p?'approval':'pairing',ip:p?.ip,requestID:p?.requestID,preferredTouch:p?.preferredTouch,
-  displayLayout:!!p?.displayLayout,repairing:!!p?.repairing,touch:!!p?.grant,scrollSpeed:settings.scrollSpeed,left:license?.remaining(),notice:p?.error||notice,port:settings?.port};}
+  displayLayout:!!p?.displayLayout,repairing:!!p?.repairing,touch:!!p?.grant,scrollSpeed:settings.scrollSpeed,update:updates?.state,updateBusy:!!p||!!checkout,left:license?.remaining(),notice:p?.error||notice,port:settings?.port};}
 function changed(){
   if(!ui||ui.isDestroyed())return;
+  updates?.presentIfIdle();
   const peer=server?.peer;
   if(peer&&!lastPeer)show();lastPeer=peer;
   ui.webContents.send('state',state());
@@ -83,7 +85,7 @@ async function listen(rotate=false,ip=settings.ip){
     server?.close();address='';qr='';notice='';
     await native.call('health');
     const ips=networks();if(!ips.includes(ip))ip=ips[0];if(!ip)throw Error('Connect this PC to the same local network as your phone, then retry.');
-    server=new Sharing({touchAllowed,rememberTouch,remaining:()=>license.remaining(),changed,startMedia,stopMedia,media,onFailure:message=>{notice=message;},sendInput:input=>native.call('input',input)});
+    server=new Sharing({installingUpdate:()=>updates?.state.phase==='launching',touchAllowed,rememberTouch,remaining:()=>license.remaining(),changed,startMedia,stopMedia,media,onFailure:message=>{notice=message;},sendInput:input=>native.call('input',input)});
     await server.listen(ip,rotate?0:settings.port||0,viewer);
     settings.ip=ip;settings.port=server.server.address().port;save();address=server.address;
   }catch(e){notice=e.code==='EADDRINUSE'?'The saved port is busy. Choose another port below.':e.message;}finally{opening=false;changed();}
@@ -110,6 +112,11 @@ async function checkPurchase(recovery,buy=false){
 async function start(){
   app.setAppUserModelId('hr.mcode.PhoneAsASecondMonitor');viewer=path.join(process.resourcesPath,'viewer');
   prefs=path.join(app.getPath('userData'),'settings.json');settings=fs.existsSync(prefs)?JSON.parse(fs.readFileSync(prefs)):{};license=new License(path.join(app.getPath('userData'),'access.bin'),safeStorage);
+  const updateCache=path.join(app.getPath('userData'),'update-cache');
+  // Previous installers are no longer needed after the app restarts.
+  await fs.promises.rm(updateCache,{recursive:true,force:true}).catch(()=>{});
+  updates=new Updates({installed:app.getVersion(),cache:updateCache,preferences:settings,save,
+    busy:()=>!!server?.peer||!!checkout,change:changed,show,launch:file=>shell.openPath(file),quit:()=>app.quit()});
   native=new Native(path.join(process.resourcesPath,'MonitorHost.exe'),()=>{notice='The Windows display helper stopped. Restart the app.';server?.reset();changed();});
   if(!scrollSpeeds.includes(settings.scrollSpeed))settings.scrollSpeed=48;
   await native.call('scrollSpeed',{pixelsPerNotch:settings.scrollSpeed});
@@ -125,6 +132,9 @@ async function start(){
     try{
       switch(op){
         case 'state':return state();
+        case 'updateCheck':await updates.check(true);break;
+        case 'updateLater':updates.later();break;
+        case 'updateInstall':await updates.install();break;
         case 'approve':if(server.peer && value?.requestID===server.peer.requestID)await server.approve(value.enabled===true);break;
         case 'disconnect':server.reset();break;
         case 'touch':
@@ -174,10 +184,12 @@ async function start(){
   await Promise.all([worker.loadFile(path.join(__dirname,'media.html')),ui.loadFile(path.join(__dirname,'host.html'))]);
   ui.on('close',e=>{if(!quitting){e.preventDefault();ui.hide();}});
   tray=new Tray(path.join(viewer,'display-icon.png'));tray.setToolTip(title);
-  tray.setContextMenu(Menu.buildFromTemplate([{label:'Open Phone as a Second Monitor',click:show},{label:'Disconnect device',click:()=>server?.reset()},{type:'separator'},{label:'Quit',click:()=>app.quit()}]));
+  tray.setContextMenu(Menu.buildFromTemplate([{label:'Open Phone as a Second Monitor',click:show},{label:'Disconnect device',click:()=>server?.reset()},{type:'separator'},{label:'Check for Updates…',click:()=>updates.check(true)},{label:'Quit',click:()=>app.quit()}]));
   tray.on('click',show);
   powerMonitor.on('lock-screen',()=>server?.reset());powerMonitor.on('suspend',()=>server?.reset());
   await listen();show();
+  void updates.check();
+  setInterval(()=>updates.check(),6*60*60*1000).unref();
   license.check().then(changed).catch(()=>{});
   let ticks=0;
   setInterval(async()=>{

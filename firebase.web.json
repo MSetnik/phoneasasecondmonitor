@@ -29,6 +29,10 @@
     ],
     "headers": [
       {
+        "source": "/updates/**",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }]
+      },
+      {
         "source": "/downloads/**",
         "headers": [
           {
@@ -50,7 +54,7 @@
     "redirects": [
       {
         "source": "/downloads/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe",
-        "destination": "https://storage.googleapis.com/phone-as-monitor-mcode-downloads/windows/x64/78fac816f5aeeb7528f954fee65c23467cb607cf7618eef83292068870329233/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe",
+        "destination": "https://storage.googleapis.com/phone-as-monitor-mcode-downloads/windows/x64/ea2729a39c47cb854b76d702746b2aeef8369100faa0397b610cf12483cd6098/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe",
         "type": 302
       }
     ],

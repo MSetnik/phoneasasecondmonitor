@@ -1,6 +1,10 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data: 'self'"><title>Phone as a Second Monitor</title><link rel="stylesheet" href="host.css">
 <header><b>Phone as a Second Monitor</b><span id="clock"></span></header>
-<main><small id="step"></small><h1 id="heading">Starting your display…</h1><p id="description"></p>
+<main><section id="updatePanel" aria-label="Software update" hidden>
+<h2 id="updateTitle">Software update</h2><p id="updateNotes"></p><p id="updateStatus" role="status"></p>
+<progress id="updateProgress" aria-label="Update download" max="100" hidden></progress>
+<button id="installUpdate" data-op="updateInstall">Update</button><button id="retryUpdate" data-op="updateCheck">Retry</button><button id="laterUpdate" class="soft" data-op="updateLater">Later</button>
+</section><small id="step"></small><h1 id="heading">Starting your display…</h1><p id="description"></p>
 <section id="pair" hidden><img id="qr" width="196" height="196" alt="Scan this code with your phone camera"><p>Or open <strong id="url"></strong> on your phone and enter</p><output id="code"></output></section>
 <section id="approval" hidden><label><input id="controls" type="checkbox"> Allow touch and keyboard control</label><p>Your choice is remembered for this browser.</p><div><button id="approve">Approve connection</button><button data-op="disconnect" class="soft">Decline</button></div></section>
 <section id="live" hidden><label><input id="touch" type="checkbox"> Allow touch and keyboard control</label>
