@@ -27,7 +27,7 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           $name='Phone-as-a-Second-Monitor-Windows-x64-Setup.exe'
           curl.exe --fail --silent --show-error "https://phone-as-monitor-mcode--windows-x64-8f44dbj9.web.app/$name" -o "dist/$name"
-          if ($LASTEXITCODE -or (Get-FileHash "dist/$name").Hash -ne 'AF20028EC003992F127F57FD943C855F7C9B0432ED174BF0EA53FAF527BA3970') {throw 'Website download does not match this preview.'}
+          if ($LASTEXITCODE -or (Get-FileHash "dist/$name").Hash -ne '00B3BCBF807993C4793D781FC77A1A0403A75CAC821098890C50CEDF8A216EF9') {throw 'Website download does not match this preview.'}
       - name: Install and pair the downloaded Windows app
         shell: powershell
         env:

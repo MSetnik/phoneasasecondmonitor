@@ -49,9 +49,13 @@ try {
   $signature=Get-AuthenticodeSignature "$store/mttvdd.cat"
   if($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*SignPath Foundation*'){throw "The installed driver catalog is not valid: $($signature.Status)."}
   Write-Host '::notice::Verified the running adapter, installed driver files and SignPath catalog in the Windows driver store.'
+  $children=(Get-PnpDeviceProperty -InstanceId $instance -KeyName DEVPKEY_Device_Children -ErrorAction SilentlyContinue).Data
+  $monitors=@(Get-PnpDevice -PresentOnly -Class Monitor -ErrorAction SilentlyContinue | ForEach-Object {$_.InstanceId})
+  $gpus=@(Get-CimInstance Win32_VideoController | ForEach-Object {$_.Name})
+  Write-Host "::notice::Windows test graphics: $($gpus -join ', '); monitor children on our adapter: $($children -join ', '); present monitors: $($monitors -join ', ')."
   $output=node windows/tests/bridge.cjs "$app/resources/MonitorHost.exe" 2>&1
   if($LASTEXITCODE){throw "Display helper IPC: $($output -join ' ')"}
-  Write-Host '::notice::The installed display helper answered the same Node IPC calls used by the tray app.'
+  Write-Host "::notice::$($output -join ' ')"
   if ($env:PASM_TEST_DESKTOP -eq '1') {
     npm ci --prefix windows/tests --ignore-scripts --no-audit --no-fund
     if ($LASTEXITCODE) {throw 'Desktop test dependency installation failed.'}

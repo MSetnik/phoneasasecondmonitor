@@ -6,7 +6,7 @@ Name "Phone as a Second Monitor"
 OutFile "..\..\dist\Phone-as-a-Second-Monitor-Windows-x64-Setup.exe"
 InstallDir "$PROGRAMFILES64\MCODE\Phone as a Second Monitor"
 RequestExecutionLevel admin
-SetCompressor /SOLID lzma
+SetCompressor lzma
 Icon "..\..\out\monitor.ico"
 UninstallIcon "..\..\out\monitor.ico"
 ShowInstDetails show
