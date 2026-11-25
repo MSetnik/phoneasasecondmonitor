@@ -111,7 +111,8 @@ internal static class Host {
                 try{
                     var d=json.Deserialize<Dictionary<string,object>>(line); id=(int)d["id"];
                     switch(S(d,"op")){
-                        case "attach":Release();area=Adapter.Attach((int)N(d,"width",320,4096),(int)N(d,"height",320,4096),(int)N(d,"fps",30,120));result=area;break;
+                        case "health":Adapter.CheckDevice();result=true;break;
+                        case "attach":Adapter.CheckDevice();Release();area=Adapter.Attach((int)N(d,"width",320,4096),(int)N(d,"height",320,4096),(int)N(d,"fps",30,120));result=area;break;
                         case "check":if(dragging && (DateTime.UtcNow-lastDrag).TotalSeconds>2.5)Release();area=Adapter.Current();result=area;break;
                         case "detach":Release();Adapter.Detach();area=null;result=true;break;
                         case "release":Release();result=true;break;

@@ -14,6 +14,15 @@ internal static class Adapter {
     [DllImport("setupapi", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool SetupDiSetDeviceRegistryProperty(IntPtr list,ref Device device,uint property,byte[] data,int size);
     [DllImport("setupapi", SetLastError=true)] static extern bool SetupDiCallClassInstaller(int command,IntPtr list,ref Device device);
     [DllImport("setupapi")] static extern bool SetupDiDestroyDeviceInfoList(IntPtr list);
+    [DllImport("cfgmgr32",CharSet=CharSet.Unicode)] static extern int CM_Locate_DevNodeW(out uint device,string instance,uint flags);
+    [DllImport("cfgmgr32")] static extern int CM_Get_DevNode_Status(out uint status,out uint problem,uint device,uint flags);
+    internal static void CheckDevice() {
+        uint device,status,problem;
+        if(CM_Locate_DevNodeW(out device,Instance,0)!=0)
+            throw new Exception("The virtual monitor driver is missing. Run the Windows installer and approve the display driver.");
+        if(CM_Get_DevNode_Status(out status,out problem,device,0)!=0 || (status&8)==0 || problem!=0)
+            throw new Exception("Windows has not started the monitor driver (device code "+problem+"). Check Device Manager, or repair the installation.");
+    }
     internal static void Install(bool remove) {
         IntPtr list = SetupDiCreateDeviceInfoList(ref display, IntPtr.Zero);
         if (list == new IntPtr(-1)) throw new System.ComponentModel.Win32Exception();

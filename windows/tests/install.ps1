@@ -1,8 +1,16 @@
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/driver-consent.ps1"
 $setup=(Get-ChildItem dist/*Setup.exe).FullName
 $result=Start-Process $setup -ArgumentList '/S' -PassThru
-if(!$result.WaitForExit(120000) -or $result.ExitCode -ne 0){
+$limit=(Get-Date).AddSeconds(100)
+while(!$result.WaitForExit(1200) -and (Get-Date) -lt $limit){
+  Confirm-TestDriverPublisher | Out-Null
+}
+if(!$result.HasExited -or $result.ExitCode -ne 0){
   $errors=Get-Content "$env:windir/inf/setupapi.dev.log" -Tail 160 | Where-Object {$_ -match '!!!|failed|error 0x'} | Select-Object -Last 8
+  Add-Type -AssemblyName UIAutomationClient
+  $titles=[System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children,[System.Windows.Automation.Condition]::TrueCondition) | ForEach-Object { $_.Current.Name }
+  Write-Host "::notice::Installer test desktop windows: $($titles -join ', ')"
   throw "Installer did not complete successfully (exit $($result.ExitCode)). PnP: $($errors -join ' / ')"
 }
 $app=Join-Path $env:ProgramFiles 'MCODE\Phone as a Second Monitor'

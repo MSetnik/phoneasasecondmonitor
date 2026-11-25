@@ -16,6 +16,7 @@ VIAddVersionKey /LANG=1033 "CompanyName" "MCODE"
 VIAddVersionKey /LANG=1033 "FileDescription" "Windows x64 installer"
 VIAddVersionKey /LANG=1033 "FileVersion" "1.0.0"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "MCODE"
+!define MUI_WELCOMEPAGE_TEXT "Setup installs the Windows app and the virtual display driver that creates your second monitor. Windows may ask you to approve the signed driver. The app can connect to phones on your private local network. You approve each device before it can see the display."
 !define MUI_FINISHPAGE_TEXT "Open Phone as a Second Monitor from Start to pair your phone. Use the same private Wi-Fi network on both devices."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_INSTFILES
@@ -26,7 +27,7 @@ VIAddVersionKey /LANG=1033 "LegalCopyright" "MCODE"
 !define APPKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\MCODEPhoneAsMonitor"
 !define VDDKEY "SOFTWARE\MikeTheTech\VirtualDisplayDriver"
 Function .onInit
-  ${IfNot} ${RunningX64}
+  ${IfNot} ${IsNativeAMD64}
     MessageBox MB_OK "This installer requires 64-bit Windows on an Intel or AMD processor."
     Abort
   ${EndIf}
@@ -48,7 +49,7 @@ Section
     WriteRegStr HKLM "${VDDKEY}" "VDDPATH" "$INSTDIR\driver"
   ${EndIf}
   ${DisableX64FSRedirection}
-  nsExec::ExecToLog '"$SYSDIR\pnputil.exe" /add-driver "$INSTDIR\driver\MttVDD.inf"'
+  nsExec::ExecToLog /TIMEOUT=240000 '"$SYSDIR\pnputil.exe" /add-driver "$INSTDIR\driver\MttVDD.inf"'
   Pop $0
   ${EnableX64FSRedirection}
   ${If} $0 != 0
