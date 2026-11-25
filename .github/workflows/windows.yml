@@ -35,6 +35,16 @@ jobs:
         run: |
           npm ci --prefix windows/tests --ignore-scripts --no-audit --no-fund
           node windows/tests/browser.cjs
+      - name: Require a publisher for the signed release
+        shell: powershell
+        run: |
+          try {
+            ./windows/scripts/build.ps1 -SignRelease
+          } catch {
+            if ($_.Exception.Message -like 'Set PASM_SIGNTOOL*') { return }
+            throw
+          }
+          throw 'Signed build accepted missing configuration.'
       - name: Compile and package
         shell: powershell
         run: |

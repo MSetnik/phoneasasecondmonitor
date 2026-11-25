@@ -42,20 +42,25 @@ internal static class ProjectionTest {
     static int Main(string[] args) {
         var wheel = new SwipeWheel();
         int x, y, vertical = 0;
-        for (int i = 0; i < 120; i++) {
+        for (int i = 0; i < 240; i++) {
             wheel.Move(0,-1,out x,out y);
             vertical+=y;
         }
-        Expect(vertical == -5, true, "Short updates must produce five notches over a 120-pixel swipe.");
-        // Use exactly representable sub-pixel fractions for the axis and batching assertions.
+        Expect(vertical == -5, true, "Short updates must produce five balanced notches over a 240-pixel swipe.");
+        foreach (int speed in new int[]{24,48,96}) {
+            wheel.SetPixelsPerNotch(speed);
+            wheel.Move(96,192,out x,out y);
+            Expect(x==-96/speed && y==192/speed,true,"Natural scrolling on both axes at each speed.");
+            wheel.Move(-96,-192,out x,out y);
+            Expect(x==96/speed && y==-192/speed,true,"Reverse the same gesture.");
+        }
+        wheel.Move(0,47,out x,out y);
+        wheel.SetPixelsPerNotch(48);
+        wheel.Move(0,1,out x,out y);
+        Expect(y==0,true,"Changing speed must clear old travel.");
+        wheel.Move(0,46,out x,out y);
         wheel.Reset();
-        wheel.Move(30,60,out x,out y);
-        Expect(x==-1 && y==2,true,"Natural scrolling on both axes.");
-        wheel.Move(-30,-60,out x,out y);
-        Expect(x==1 && y==-2,true,"Reversing direction returns to the initial position.");
-        wheel.Move(0,12,out x,out y);
-        wheel.Reset();
-        wheel.Move(0,12,out x,out y);
+        wheel.Move(0,1,out x,out y);
         Expect(y==0,true,"A new gesture must not inherit an old fraction.");
         CheckLayouts();
         Console.WriteLine("Projection policy passed for two, disconnected and multiple targets.");

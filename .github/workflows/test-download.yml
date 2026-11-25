@@ -27,7 +27,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           $name='Phone-as-a-Second-Monitor-Windows-x64-Setup.exe'
-          $sha='95d8a05d718c602003753c2621de54eb2bffc1bd67358e7381cf2d268552fd9b'
+          $sha='09b1e4bcb39111a13f22eeb13134e3733e938cd70350d22f4f7fa88d2cdce5d0'
           $url="https://storage.googleapis.com/phone-as-monitor-mcode-downloads/windows/x64/$sha/$name"
           curl.exe --location --fail --silent --show-error $url -o "dist/$name"
           if ($LASTEXITCODE -or (Get-FileHash "dist/$name").Hash -ne $sha) {throw 'Website candidate does not match the pinned installer.'}

@@ -123,6 +123,7 @@ internal static class Host {
                     switch(S(d,"op")){
                         case "repair":result=Adapter.RestartDriver(true);break;
                         case "diagnostics":result=Adapter.Diagnostics();break;
+                        case "scrollSpeed":wheel.SetPixelsPerNotch((int)N(d,"pixelsPerNotch",24,96));result=true;break;
                         case "health":Adapter.CheckDevice();result=true;break;
                         case "attach":Adapter.CheckDevice();Release();area=Adapter.Attach((int)N(d,"width",320,4096),(int)N(d,"height",320,4096),(int)N(d,"fps",30,120));result=area;break;
                         case "check":if(dragging && (DateTime.UtcNow-lastDrag).TotalSeconds>2.5)Release();var activeArea=Adapter.Current();if(area!=null)area=activeArea;result=activeArea;break;

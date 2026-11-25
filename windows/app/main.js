@@ -7,6 +7,7 @@ const title='Phone as a Second Monitor';
 let ui,worker,tray,server,native,license,settings,prefs,viewer,qr='',notice='',address='',blocker;
 let lastPeer=null,expired=false,quitting=false,mediaID=0,chain=Promise.resolve(),opening=false,checkout,checkingTopology=false;
 const calls=new Map();
+const scrollSpeeds=[96,48,24];
 if(!app.requestSingleInstanceLock())app.quit();
 else {
   app.on('second-instance',()=>show());
@@ -16,7 +17,7 @@ function show(){if(ui){ui.show();ui.focus();}}
 function save(){fs.writeFileSync(prefs+'.tmp',JSON.stringify(settings));fs.renameSync(prefs+'.tmp',prefs);}
 function networks(){return [...new Set(Object.values(os.networkInterfaces()).flat().filter(n=>n && n.family==='IPv4' && !n.internal && !n.address.startsWith('169.254.')).map(n=>n.address))];}
 function state(){const p=server?.peer;return {ready:!!address,ips:networks(),address,qr,code:server?.code,phase:p?.error?'failed':p?.delivered?'live':p?.approved?'preparing':p?'approval':'pairing',ip:p?.ip,
-  displayLayout:!!p?.displayLayout,repairing:!!p?.repairing,touch:!!p?.grant,left:license?.remaining(),notice:p?.error||notice,port:settings?.port};}
+  displayLayout:!!p?.displayLayout,repairing:!!p?.repairing,touch:!!p?.grant,scrollSpeed:settings.scrollSpeed,left:license?.remaining(),notice:p?.error||notice,port:settings?.port};}
 function changed(){
   if(!ui||ui.isDestroyed())return;
   const peer=server?.peer;
@@ -102,6 +103,8 @@ async function start(){
   app.setAppUserModelId('hr.mcode.PhoneAsASecondMonitor');viewer=path.join(process.resourcesPath,'viewer');
   prefs=path.join(app.getPath('userData'),'settings.json');settings=fs.existsSync(prefs)?JSON.parse(fs.readFileSync(prefs)):{};license=new License(path.join(app.getPath('userData'),'access.bin'),safeStorage);
   native=new Native(path.join(process.resourcesPath,'MonitorHost.exe'),()=>{notice='The Windows display helper stopped. Restart the app.';server?.reset();changed();});
+  if(!scrollSpeeds.includes(settings.scrollSpeed))settings.scrollSpeed=48;
+  await native.call('scrollSpeed',{pixelsPerNotch:settings.scrollSpeed});
   worker=localWindow('media.html','media-preload.js',{show:false,skipTaskbar:true});
   ui=localWindow('host.html','preload.js',{title,width:530,height:760,minWidth:440,minHeight:540,show:false,icon:path.join(viewer,'display-icon.png')});
   ipcMain.on('capture-reply',(e,r)=>{if(trusted(e,worker))calls.get(r.id)?.finish(r.result,r.error);});
@@ -117,6 +120,12 @@ async function start(){
         case 'approve':await server.approve(value===true);break;
         case 'disconnect':server.reset();break;
         case 'touch':if(server.peer?.ready){server.peer.grant=value===true?crypto.randomUUID():null;await native.call('release');}break;
+        case 'scrollSpeed':
+          if(scrollSpeeds.includes(value)){
+            await native.call('scrollSpeed',{pixelsPerNotch:value});
+            settings.scrollSpeed=value;save();
+          }
+          break;
         case 'network':if(networks().includes(value))await listen(false,value);break;
         case 'rotate':await listen(true);break;
         case 'retry':await listen();break;

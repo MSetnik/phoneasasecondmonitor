@@ -1,6 +1,9 @@
+param([switch]$SignRelease)
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path "$PSScriptRoot/../..").Path
 Set-Location $root
+$signer = Join-Path $PSScriptRoot 'sign-release.ps1'
+if ($SignRelease) { & $signer -CheckConfiguration }
 New-Item -ItemType Directory -Force out | Out-Null
 $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $refs = "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
@@ -16,9 +19,25 @@ $sig=Get-AuthenticodeSignature out/product/driver/mttvdd.cat
 if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notlike '*SignPath Foundation*') { throw "Driver signature verification failed: $($sig.Status)" }
 $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
 if (!(Test-Path $nsis)) { throw 'Install NSIS 3.x first.' }
+$fileName = 'Phone-as-a-Second-Monitor-Windows-x64-Setup.exe'
+$options = @('/V3')
+if ($SignRelease) {
+  & $signer "$root/out/product/PhoneAsMonitor.exe"
+  & $signer "$root/out/product/resources/MonitorHost.exe"
+  New-Item -ItemType Directory -Force out/signed-candidate | Out-Null
+  $options += "/DMCODE_SIGN_SCRIPT=$signer"
+}
 Push-Location windows/installer
 try {
-  $lines = & $nsis /V3 setup.nsi 2>&1
+  $lines = & $nsis @options setup.nsi 2>&1
   if ($LASTEXITCODE) { throw ("NSIS: " + (($lines | Select-Object -Last 8) -join " / ")) }
 } finally { Pop-Location }
-Get-FileHash dist/*.exe
+if ($SignRelease) {
+  $candidate = Join-Path "$root/out/signed-candidate" $fileName
+  & $signer $candidate
+  New-Item -ItemType Directory -Force dist/signed | Out-Null
+  Move-Item -Force -LiteralPath $candidate -Destination "dist/signed/$fileName"
+  Get-FileHash "dist/signed/$fileName"
+} else {
+  Get-FileHash "dist/$fileName"
+}

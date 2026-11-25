@@ -1,8 +1,9 @@
 'use strict';
 const { _electron,chromium }=require('playwright-core');
 const path=require('node:path');
+const fs=require('node:fs');
 const assert=require('node:assert/strict');
-async function checkTouchScroll(host,phone){
+async function checkTouchScroll(host,control,phone){
   await host.evaluate(async({BrowserWindow,screen})=>{
     const display=screen.getAllDisplays().find(d=>d.id!==screen.getPrimaryDisplay().id);
     if(!display)throw Error('The scroll test needs the extended desktop.');
@@ -16,21 +17,37 @@ async function checkTouchScroll(host,phone){
     const rect=await phone.locator('#surface').boundingBox();
     const x=rect.x+rect.width*.4,y=rect.y+rect.height*.55;
     const session=await phone.context().newCDPSession(phone);
-    await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
-    for(let i=1;i<=24;i++){
-      await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y-i*3}]});
+    const speed=control.locator('#scrollSpeed');
+    assert.equal(await speed.inputValue(),'48','Balanced is the initial speed.');
+    const distances=[];
+    for(const value of ['96','48','24']){
+      await speed.selectOption(value);
+      await control.waitForFunction(async value=>(await window.host.action('state')).scrollSpeed===Number(value),value);
+      const userData=await host.evaluate(({app})=>app.getPath('userData'));
+      const saved=JSON.parse(fs.readFileSync(path.join(userData,'settings.json'),'utf8'));
+      assert.equal(saved.scrollSpeed,Number(value),'The speed is saved for the next launch.');
+      await host.evaluate(()=>{
+        global.scrollTestWindow.focus();
+        return global.scrollTestWindow.webContents.executeJavaScript('window.scrollTo(0,0)');
+      });
+      await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+      for(let i=1;i<=24;i++){
+        await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y-i*3}]});
+      }
+      await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+      let scroll=0, settled=0;
+      for(let i=0;i<35 && settled<3;i++){
+        await new Promise(r=>setTimeout(r,100));
+        const position=await host.evaluate(()=>global.scrollTestWindow.webContents.executeJavaScript('window.scrollY'));
+        settled=position>0 && position===scroll?settled+1:0;
+        scroll=position;
+      }
+      distances.push(scroll);
     }
-    await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     await session.detach();
-    let scroll=0, settled=0;
-    for(let i=0;i<35 && settled<3;i++){
-      await new Promise(r=>setTimeout(r,100));
-      const position=await host.evaluate(()=>global.scrollTestWindow.webContents.executeJavaScript('window.scrollY'));
-      settled=position>0 && position===scroll?settled+1:0;
-      scroll=position;
-    }
-    assert.ok(scroll>=60,'A 72 CSS pixel swipe moved the Windows page only '+scroll+' CSS pixels.');
-    console.log('A 72 CSS pixel touchscreen swipe scrolled the page on the extended Windows desktop by '+scroll+' CSS pixels.');
+    console.log('72 CSS pixel swipe, Gentle / Balanced / Fast in Windows page pixels: '+distances.join(' / '));
+    assert.ok(distances[0]>0 && distances[0]<distances[1] && distances[1]<distances[2],
+      'Expected progressively longer scrolling at each speed, got '+distances.join(', '));
   }finally{
     await host.evaluate(()=>{global.scrollTestWindow.destroy();delete global.scrollTestWindow;});
   }
@@ -71,7 +88,7 @@ async function main(){
     }
     await phone.waitForFunction(()=>document.querySelector('#movie').readyState>=2 && document.querySelector('#movie').currentTime>0.25,{},{timeout:25000});
     assert.equal(await control.locator('#heading').innerText(),'Your second monitor is ready');
-    await checkTouchScroll(host,phone);
+    await checkTouchScroll(host,control,phone);
     await phone.locator('#menu').click();
     await phone.locator('[data-action=start]').waitFor();
     assert.equal(await phone.locator('[data-action=dock]').isVisible(),false);

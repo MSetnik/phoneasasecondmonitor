@@ -14,6 +14,7 @@ function render(s){
  expired:['Lifetime access','Your free demo has ended','Unlock once to keep using your phone as a second monitor, or restore an earlier purchase.']};
  const [step,title,description]=copy[phase];el('step').textContent=step;el('heading').textContent=title;el('description').textContent=description;
  el('pair').hidden=phase!=='pairing';el('approval').hidden=phase!=='approval';el('live').hidden=phase!=='live';el('error').hidden=phase!=='failed';el('touch').checked=s.touch;
+ el('scrollSpeed').value=String(s.scrollSpeed);el('scrollSpeed').disabled=!s.touch;
  if(s.qr&&el('qr').getAttribute('src')!==s.qr)el('qr').src=s.qr;
  el('url').textContent='http://'+s.address;el('code').textContent=s.code||'';el('notice').textContent=s.repairing?'Waiting for Windows to restart the virtual display adapter…':s.notice||'';
  const repair=document.querySelector('[data-op="repair"]');
@@ -29,6 +30,7 @@ function render(s){
 async function run(name,value){try{render(await host.action(name,value));}catch{el('notice').textContent='The app could not complete this action. Reopen it and try again.';}}
 document.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>run(b.dataset.op));
 el('approve').onclick=()=>run('approve',el('controls').checked);el('touch').onchange=()=>run('touch',el('touch').checked);
+el('scrollSpeed').onchange=()=>run('scrollSpeed',Number(el('scrollSpeed').value));
 el('network').onchange=()=>run('network',el('network').value);
 el('restore').onsubmit=e=>{e.preventDefault();const key=el('key').value;el('key').value='';run('restore',key);};
 host.onState(render);run('state');
