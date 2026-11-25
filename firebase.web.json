@@ -50,7 +50,7 @@
     "redirects": [
       {
         "source": "/downloads/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe",
-        "destination": "https://storage.googleapis.com/phone-as-monitor-mcode-downloads/windows/x64/09b1e4bcb39111a13f22eeb13134e3733e938cd70350d22f4f7fa88d2cdce5d0/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe",
+        "destination": "https://storage.googleapis.com/phone-as-monitor-mcode-downloads/windows/x64/78fac816f5aeeb7528f954fee65c23467cb607cf7618eef83292068870329233/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe",
         "type": 302
       }
     ],
