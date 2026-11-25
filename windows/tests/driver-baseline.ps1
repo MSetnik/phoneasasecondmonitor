@@ -10,7 +10,7 @@ function Test-UpstreamMonitor {
   $dir=Join-Path $env:windir 'ServiceProfiles\LocalService\AppData\Local\MCODE-Driver-Test'
   New-Item -ItemType Directory -Path $dir -Force | Out-Null
   $zip="$dir/vendor.zip"
-  curl.exe --fail --silent --show-error 'https://github.com/VirtualDrivers/Virtual-Display-Driver/releases/download/25.7.23/VirtualDisplayDriver-x86.Driver.Only.zip' -o $zip
+  curl.exe --location --fail --silent --show-error 'https://github.com/VirtualDrivers/Virtual-Display-Driver/releases/download/25.7.23/VirtualDisplayDriver-x86.Driver.Only.zip' -o $zip
   if($LASTEXITCODE -or (Get-FileHash $zip).Hash -ne 'E24210692B442B39AF763536330CE78B423F19342B7A7792C26DE3944E418B3A'){throw 'Unexpected vendor baseline package.'}
   Expand-Archive $zip "$dir/upstream" -Force
   $xml=[xml](Get-Content "$dir/upstream/VirtualDisplayDriver/vdd_settings.xml" -Raw)
