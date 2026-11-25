@@ -7,14 +7,19 @@ function render(s){
  approval:['Step 2 of 3','Approve this device','A device at '+s.ip+' wants to use the second display.'],
  preparing:['Step 3 of 3','Preparing the monitor','Windows is extending your desktop. Waiting for the first frame on your phone.'],
  live:['Connected','Your second monitor is ready','Drag a window onto the new display. Use the chevron on your phone for the keyboard and shortcuts.'],
- failed:['Connection interrupted','The monitor could not start','Repair restarts the app’s virtual display adapter. Windows may ask for administrator approval.'],
+ failed:s.displayLayout
+   ? ['Display setup','Extend your Windows desktop','Open Display settings and choose Extend for the virtual monitor. Then start a new pairing.']
+   : ['Connection interrupted','The monitor could not start','Repair restarts the app’s virtual display adapter. Windows may ask for administrator approval.'],
  offline:['Connection setup','Connect to your local network','Use the connection settings below to retry or choose another port.'],
  expired:['Lifetime access','Your free demo has ended','Unlock once to keep using your phone as a second monitor, or restore an earlier purchase.']};
  const [step,title,description]=copy[phase];el('step').textContent=step;el('heading').textContent=title;el('description').textContent=description;
  el('pair').hidden=phase!=='pairing';el('approval').hidden=phase!=='approval';el('live').hidden=phase!=='live';el('error').hidden=phase!=='failed';el('touch').checked=s.touch;
  if(s.qr&&el('qr').getAttribute('src')!==s.qr)el('qr').src=s.qr;
  el('url').textContent='http://'+s.address;el('code').textContent=s.code||'';el('notice').textContent=s.repairing?'Waiting for Windows to restart the virtual display adapter…':s.notice||'';
- document.querySelector('[data-op="repair"]').disabled=s.repairing;
+ const repair=document.querySelector('[data-op="repair"]');
+ repair.hidden=s.displayLayout;
+ repair.disabled=s.repairing;
+ document.querySelector('[data-op="display"]').classList.toggle('soft',!s.displayLayout);
  document.querySelector('#error [data-op="disconnect"]').disabled=s.repairing;
  el('clock').textContent=s.left===null?'Lifetime access':'Demo '+Math.floor(s.left/60)+':'+String(s.left%60).padStart(2,'0');
  if(phase==='expired')el('purchase').open=true;el('buy').hidden=s.left===null;el('copy').hidden=s.left!==null;

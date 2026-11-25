@@ -16,7 +16,7 @@ function show(){if(ui){ui.show();ui.focus();}}
 function save(){fs.writeFileSync(prefs+'.tmp',JSON.stringify(settings));fs.renameSync(prefs+'.tmp',prefs);}
 function networks(){return [...new Set(Object.values(os.networkInterfaces()).flat().filter(n=>n && n.family==='IPv4' && !n.internal && !n.address.startsWith('169.254.')).map(n=>n.address))];}
 function state(){const p=server?.peer;return {ready:!!address,ips:networks(),address,qr,code:server?.code,phase:p?.error?'failed':p?.delivered?'live':p?.approved?'preparing':p?'approval':'pairing',ip:p?.ip,
-  repairing:!!p?.repairing,touch:!!p?.grant,left:license?.remaining(),notice:p?.error||notice,port:settings?.port};}
+  displayLayout:!!p?.displayLayout,repairing:!!p?.repairing,touch:!!p?.grant,left:license?.remaining(),notice:p?.error||notice,port:settings?.port};}
 function changed(){
   if(!ui||ui.isDestroyed())return;
   const peer=server?.peer;
@@ -132,7 +132,7 @@ async function start(){
         }
         case 'repair':{
           const peer=server?.peer;
-          if(!peer?.error || peer.repairing)break;
+          if(!peer?.error || peer.repairing || peer.displayLayout)break;
           peer.repairing=true;changed();
           try{
             const reboot=await native.call('repair');

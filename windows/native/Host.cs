@@ -124,7 +124,7 @@ internal static class Host {
                         default:throw new Exception("Unknown operation.");
                     }
                     output.WriteLine(json.Serialize(new{id=id,result=result}));
-                }catch(Exception e){output.WriteLine(json.Serialize(new{id=id,error=e.Message}));}
+                }catch(Exception e){output.WriteLine(json.Serialize(new{id=id,error=e.Message,displayLayout=e is Adapter.DisplayLayoutException}));}
             }
             Release();if(area!=null)Adapter.Detach();return 0;
         }catch(Exception e){Console.Error.WriteLine(e.Message);return 1;}

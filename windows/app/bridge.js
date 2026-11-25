@@ -6,7 +6,8 @@ class Native {
     this.process=spawn(file,[],{windowsHide:true,stdio:['pipe','pipe','ignore']});
     readline.createInterface({input:this.process.stdout}).on('line',line=>{
       try{const r=JSON.parse(line);const call=this.pending.get(r.id);if(!call)return;
-        this.pending.delete(r.id);r.error?call.reject(Error(r.error)):call.resolve(r.result);
+        this.pending.delete(r.id);if(r.error){const error=Error(r.error);error.displayLayout=r.displayLayout===true;call.reject(error);}
+        else call.resolve(r.result);
       }catch{this.process.kill();}
     });
     this.process.on('error',()=>this.fail(onExit));this.process.on('exit',()=>this.fail(onExit));

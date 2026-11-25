@@ -66,6 +66,14 @@ try {
   if ($env:PASM_TEST_DESKTOP -eq '1') {
     npm ci --prefix windows/tests --ignore-scripts --no-audit --no-fund
     if ($LASTEXITCODE) {throw 'Desktop test dependency installation failed.'}
+    if ($env:GITHUB_ACTIONS -eq 'true' -and $env:PASM_RUNNER_KIND -eq 'github-hosted') {
+      $compiler="$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+      & $compiler /nologo /platform:x64 /out:dist\ProjectionTest.exe /reference:System.Windows.Forms.dll,System.Drawing.dll windows/tests/Projection.cs windows/native/Adapter.cs
+      if ($LASTEXITCODE) {throw 'Could not compile the projection regression test.'}
+      $projection= & dist/ProjectionTest.exe prepare-desktop 2>&1
+      if ($LASTEXITCODE) {throw "Could not stage the projection test. $($projection -join ' ')"}
+      Write-Host "::notice::$($projection -join ' ')"
+    }
     $lines = node windows/tests/display.cjs 2>&1
     if ($LASTEXITCODE) {throw ("Extended desktop test: " + ($lines -join ' '))}
     Write-Host $lines

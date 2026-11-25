@@ -257,6 +257,46 @@ internal static class Adapter {
         }
         return null;
     }
+    internal sealed class DisplayLayoutException : Exception {
+        internal DisplayLayoutException(string message) : base(message) {}
+    }
+    // Count physical/virtual targets, not source-target combinations. A laptop GPU can
+    // advertise more than a hundred possible paths for just two connected displays.
+    internal static bool CanUseSystemExtend(byte[] paths,int count,Func<int,bool> owned) {
+        var targets=new List<int>(2);
+        for(int i=0;i<count;i++){
+            int row=i*72;
+            bool active=(Field(paths,row+68)&1)!=0;
+            if(!active && Field(paths,row+60)==0)continue;
+            int match=targets.FindIndex(other=>SameEndpoint(paths,other+20,row+20));
+            if(match>=0){
+                if(active)targets[match]=row;
+            }else{
+                if(targets.Count==2)return false;
+                targets.Add(row);
+            }
+        }
+        if(targets.Count!=2)return false;
+        bool first=owned(targets[0]),second=owned(targets[1]);
+        if(first==second)return false;
+        return Field(paths,targets[first?0:1]+60)!=0 && (Field(paths,targets[first?1:0]+68)&1)!=0;
+    }
+    static string TrySystemExtend(out int status) {
+        status=0;
+        byte[] paths,modes;int count,modeCount;
+        if(ReadPaths(1,out paths,out count,out modes,out modeCount)!=0 ||
+           !CanUseSystemExtend(paths,count,row=>OwnsTarget(paths,row)))return null;
+        const uint topologyExtend=0x4, apply=0x80;
+        // Delegate source assignment to the same Windows projection mode as Win+P → Extend.
+        status=SetDisplayConfig(0,null,0,null,topologyExtend|apply);
+        if(status!=0)return null;
+        for(int retry=0;retry<20;retry++){
+            var source=Source(true);
+            if(source!=null)return source;
+            Thread.Sleep(200);
+        }
+        return null;
+    }
     static string EnableOwnPath(){
         bool sawTarget=false, applied=false;
         int lastError=0;
@@ -309,13 +349,18 @@ internal static class Adapter {
             Thread.Sleep(300);
         }while(wait.ElapsedMilliseconds<5000);
         if(!sawTarget && !HasChild())throw new Exception("The virtual display driver is installed, but Windows has not detected its monitor. Choose Repair display driver.");
-        if(applied)throw new Exception("Windows accepted the display change, but the virtual monitor did not become active. Choose Repair display driver.");
-        if(lastError!=0)throw new Exception("Windows rejected the virtual display configuration (code "+lastError+"). Choose Repair display driver.");
-        throw new Exception("Windows has not exposed an independent desktop for the virtual monitor. Choose Repair display driver.");
+        int projectionStatus;
+        string extended=TrySystemExtend(out projectionStatus);
+        if(extended!=null)return extended;
+        if(projectionStatus!=0)lastError=projectionStatus;
+        string detail=lastError!=0?"Windows returned display code "+lastError+".":
+            applied?"Windows accepted the change but did not expose a separate desktop.":"Windows has not provided an independent desktop for the virtual monitor.";
+        throw new DisplayLayoutException(detail+" In Display settings, extend the desktop to the virtual monitor, then start a new pairing.");
     }
     internal static string Source(bool requireActive) {
         byte[] paths,modes;int count,modeCount;
         bool cloned=false;
+        var primary=System.Windows.Forms.Screen.PrimaryScreen;
         if(ReadPaths(requireActive?2u:1u,out paths,out count,out modes,out modeCount)==0){
             for(int i=0;i<count;i++){
                 int row=i*72;
@@ -323,7 +368,12 @@ internal static class Adapter {
                 bool shared=false;
                 for(int j=0;j<count;j++)if(j!=i && (Field(paths,j*72+68)&1)!=0 && SameEndpoint(paths,row,j*72))shared=true;
                 if(shared){cloned=true;continue;}
-                var name=ReadName(paths,row,1);if(!String.IsNullOrEmpty(name))return name;
+                var name=ReadName(paths,row,1);
+                if(String.IsNullOrEmpty(name))continue;
+                if(primary!=null && String.Equals(name,primary.DeviceName,StringComparison.OrdinalIgnoreCase)){
+                    cloned=true;continue;
+                }
+                return name;
             }
         }
         return cloned?null:GdiSource(requireActive);
