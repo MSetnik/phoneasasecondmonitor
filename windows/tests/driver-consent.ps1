@@ -27,8 +27,30 @@ function Confirm-TestDriverPublisher {
         if($toggle.Current.ToggleState.ToString() -eq 'On'){$toggle.Toggle();return $false}
         if($toggle.Current.ToggleState.ToString() -ne 'Off' -or !$button.Current.IsEnabled){continue}
         $invoke=$null
-        if(!$button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern,[ref]$invoke)){continue}
-        $invoke.Invoke()
+        if($button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern,[ref]$invoke)){
+            $invoke.Invoke()
+        }else{
+            # The Windows publisher dialog exposes Install as an accessible pane
+            # on Server 2022. Use its visible click point, just as a tester would.
+            if(!('DriverTestPointer' -as [type])){
+                Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class DriverTestPointer {
+    [DllImport("user32")] public static extern bool SetCursorPos(int x,int y);
+    [DllImport("user32")] public static extern void mouse_event(uint flags,uint x,uint y,uint data,UIntPtr extra);
+}
+'@
+            }
+            $rect=$button.Current.BoundingRectangle
+            if($rect.IsEmpty -or $rect.Width -le 0 -or $rect.Height -le 0){continue}
+            $point=New-Object System.Windows.Point(($rect.X+$rect.Width/2),($rect.Y+$rect.Height/2))
+            $hit=[System.Windows.Automation.AutomationElement]::FromPoint($point)
+            if($hit.Current.ProcessId -ne $window.Current.ProcessId -or $hit.Current.Name.Replace('&','').Trim() -ne 'Install'){continue}
+            if(![DriverTestPointer]::SetCursorPos([int]$point.X,[int]$point.Y)){continue}
+            [DriverTestPointer]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
+            [DriverTestPointer]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
+        }
         Write-Host '::notice::Approved the verified SignPath Foundation driver once in the disposable test VM.'
         return $true
     }
