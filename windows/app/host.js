@@ -1,6 +1,10 @@
 'use strict';
 const el=id=>document.getElementById(id);
 function render(s){
+ if((s.requestID||'')!==el('approval').dataset.requestId){
+   el('approval').dataset.requestId=s.requestID||'';
+   el('controls').checked=s.preferredTouch===true;
+ }
  const phase=s.left===0?'expired':!s.ready?'offline':s.phase;
  const copy={
  pairing:['Step 1 of 3','Connect your phone','Join the same Wi-Fi network, then scan the QR code with your phone camera.'],
@@ -29,7 +33,9 @@ function render(s){
 }
 async function run(name,value){try{render(await host.action(name,value));}catch{el('notice').textContent='The app could not complete this action. Reopen it and try again.';}}
 document.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>run(b.dataset.op));
-el('approve').onclick=()=>run('approve',el('controls').checked);el('touch').onchange=()=>run('touch',el('touch').checked);
+function touchChoice(id){return {requestID:el('approval').dataset.requestId,enabled:el(id).checked};}
+el('approve').onclick=()=>run('approve',touchChoice('controls'));
+el('touch').onchange=()=>run('touch',touchChoice('touch'));
 el('scrollSpeed').onchange=()=>run('scrollSpeed',Number(el('scrollSpeed').value));
 el('network').onchange=()=>run('network',el('network').value);
 el('restore').onsubmit=e=>{e.preventDefault();const key=el('key').value;el('key').value='';run('restore',key);};

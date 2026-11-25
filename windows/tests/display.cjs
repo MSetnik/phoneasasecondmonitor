@@ -79,6 +79,8 @@ async function main(){
         .observe(document.querySelector('#notice'),{childList:true,subtree:true,characterData:true});
     });
     await phone.goto(url+'/#'+code);await phone.locator('#form button').click();
+    await control.locator('#approval').waitFor();
+    assert.equal(await control.locator('#controls').isChecked(),false);
     await control.locator('#controls').check();await control.locator('#approve').click();
     try{
       await phone.waitForFunction(()=>document.querySelector('#picture').naturalWidth>0 || document.querySelector('#movie').videoWidth>0,{},{timeout:35000});
@@ -95,6 +97,28 @@ async function main(){
     assert.equal(await phone.locator('#demoClock').isVisible(),true);
     await control.locator('#live [data-op=disconnect]').click();
     await control.locator('#pair').waitFor();
+    async function requestPair(page){
+      const fresh=await control.locator('#code').innerText();
+      await page.goto('about:blank');
+      await page.goto(url+'/#'+fresh);
+      await page.locator('#form button').click();
+      await control.locator('#approval').waitFor();
+    }
+    async function decline(){
+      await control.locator('#approval [data-op=disconnect]').click();
+      await control.locator('#pair').waitFor();
+    }
+    await requestPair(phone);
+    assert.equal(await control.locator('#controls').isChecked(),true,'Same browser should remember touch.');
+    await control.locator('#controls').uncheck();
+    await decline();
+    const other=await browser.newPage();
+    await requestPair(other);
+    assert.equal(await control.locator('#controls').isChecked(),false,'New browser should start view-only.');
+    await decline();
+    await requestPair(phone);
+    assert.equal(await control.locator('#controls').isChecked(),true,'A declined request must preserve the preference.');
+    console.log('Remembered touch for the returning browser and isolated the new browser.');
     console.log('Windows app, local approval, extended-monitor WebRTC frames, Windows menu, trial clock and disconnect passed.');
   }finally{await browser?.close();await host.close();}
 }

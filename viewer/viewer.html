@@ -378,6 +378,16 @@ body:has(#setup:not([hidden])){background:radial-gradient(ellipse at 12% 0%,#182
     el('code').removeAttribute('aria-invalid');
   }
   el('code').addEventListener('input', clearCodeError);
+  function viewerKey() {
+    try {
+      var key = localStorage.getItem('second-monitor-device');
+      if (key && /^[a-f0-9]{64}$/.test(key)) return key;
+      var bytes = crypto.getRandomValues(new Uint8Array(32));
+      key = Array.from(bytes, function (byte) { return ('0' + byte.toString(16)).slice(-2); }).join('');
+      localStorage.setItem('second-monitor-device', key);
+      return key;
+    } catch (_) { return ''; }
+  }
   function pair(ev) {
     ev.preventDefault();
     if (!el('code').validity.valid) {
@@ -393,7 +403,10 @@ body:has(#setup:not([hidden])){background:radial-gradient(ellipse at 12% 0%,#182
     el('code').blur();
     waiting('Requesting a connection…');
     var hz = Number(el('fps').value) || (window.GalaxyVideo ? GalaxyVideo.refreshHz() : 60);
-    pending = request('POST', '/pair', {'X-Pair-Code': el('code').value, 'X-Viewport': viewport(), 'X-Refresh-Hz': hz}, false, function (req) {
+    var headers = {'X-Pair-Code': el('code').value, 'X-Viewport': viewport(), 'X-Refresh-Hz': hz};
+    var key = viewerKey();
+    if (key) headers['X-Viewer-Key'] = key;
+    pending = request('POST', '/pair', headers, false, function (req) {
       if (run !== cycle) return;
       if (!req || req.status !== 200) return reset(req ? req.responseText : 'Computer unavailable. Check Wi-Fi and the address.');
       store(req.responseText);

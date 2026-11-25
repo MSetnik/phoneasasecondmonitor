@@ -18,7 +18,7 @@ async function main(){
       const current=++id;calls.set(current,{resolve,reject});
       sender.evaluate(r=>window.sendToCapture(r),{id:current,op,args}).catch(reject);
     });
-    host=new Sharing({remaining:()=>1160,changed(){},media,stopMedia(){void media('stop').catch(()=>{});},
+    host=new Sharing({touchAllowed:()=>false,rememberTouch(){},remaining:()=>1160,changed(){},media,stopMedia(){void media('stop').catch(()=>{});},
       async startMedia(size){await media('start',{source:'test',area:size});return size;},
       async sendInput(input){events.push(input);return {status:204,responseText:''};}});
     await host.listen('127.0.0.1',0,path.resolve(__dirname,'../../viewer'));

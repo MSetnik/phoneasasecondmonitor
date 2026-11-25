@@ -35,8 +35,14 @@ class Sharing {
   }
   async approve(touch){
     const p=this.peer;if(!p||p.approved||this.remaining()===0)return;
-    p.approved=true;p.grant=touch?crypto.randomUUID():null;
+    this.setTouch(p,touch);p.approved=true;
     await this.resize(p,p.size);
+  }
+  setTouch(p,enabled){
+    if(!p || p!==this.peer)return;
+    if(!enabled)p.grant=null;
+    if(p.viewerID)this.rememberTouch(p.viewerID,enabled);
+    p.grant=enabled?crypto.randomUUID():null;
   }
   async resize(p,size){
     if(p.busy||this.peer!==p)return;
@@ -77,7 +83,9 @@ class Sharing {
       if(this.failures.length>=8)return reply(429,'Too many attempts. Try again in one minute.');
       if(h['x-pair-code']!==this.code){this.failures.push(Date.now());return reply(403,'Check the code on your PC.');}
       const now=Date.now();
-      this.peer={ip,token:crypto.randomUUID(),size:layout(h['x-viewport'],Number(h['x-refresh-hz'])),seen:now,created:now,approved:false,seq:0};
+      const key=h['x-viewer-key'];
+      const viewerID=typeof key==='string' && /^[0-9a-f]{64}$/.test(key)?crypto.createHash('sha256').update(key).digest('hex'):null;
+      this.peer={viewerID,requestID:crypto.randomUUID(),preferredTouch:!!viewerID && this.touchAllowed(viewerID),ip,token:crypto.randomUUID(),size:layout(h['x-viewport'],Number(h['x-refresh-hz'])),seen:now,created:now,approved:false,seq:0};
       this.changed();return reply(200,this.peer.token);
     }
     const p=this.peer;

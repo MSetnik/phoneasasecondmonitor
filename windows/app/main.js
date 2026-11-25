@@ -1,6 +1,6 @@
 'use strict';
 const {app,BrowserWindow,Tray,Menu,screen,desktopCapturer,ipcMain,safeStorage,clipboard,shell,dialog,powerMonitor,powerSaveBlocker}=require('electron');
-const os=require('node:os'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const os=require('node:os'),fs=require('node:fs'),path=require('node:path');
 const QR=require('qrcode');
 const {Sharing}=require('./server'),{Native}=require('./bridge'),{License}=require('./license');
 const title='Phone as a Second Monitor';
@@ -16,7 +16,7 @@ else {
 function show(){if(ui){ui.show();ui.focus();}}
 function save(){fs.writeFileSync(prefs+'.tmp',JSON.stringify(settings));fs.renameSync(prefs+'.tmp',prefs);}
 function networks(){return [...new Set(Object.values(os.networkInterfaces()).flat().filter(n=>n && n.family==='IPv4' && !n.internal && !n.address.startsWith('169.254.')).map(n=>n.address))];}
-function state(){const p=server?.peer;return {ready:!!address,ips:networks(),address,qr,code:server?.code,phase:p?.error?'failed':p?.delivered?'live':p?.approved?'preparing':p?'approval':'pairing',ip:p?.ip,
+function state(){const p=server?.peer;return {ready:!!address,ips:networks(),address,qr,code:server?.code,phase:p?.error?'failed':p?.delivered?'live':p?.approved?'preparing':p?'approval':'pairing',ip:p?.ip,requestID:p?.requestID,preferredTouch:p?.preferredTouch,
   displayLayout:!!p?.displayLayout,repairing:!!p?.repairing,touch:!!p?.grant,scrollSpeed:settings.scrollSpeed,left:license?.remaining(),notice:p?.error||notice,port:settings?.port};}
 function changed(){
   if(!ui||ui.isDestroyed())return;
@@ -69,13 +69,21 @@ async function startMedia(size,p){
     return area;
   });
 }
+function touchAllowed(id){return Array.isArray(settings.touchViewers) && settings.touchViewers.includes(id);}
+function rememberTouch(id,enabled){
+  if(touchAllowed(id)===enabled)return;
+  const previous=settings.touchViewers;
+  const ids=Array.isArray(previous)?previous:[];
+  settings.touchViewers=enabled?[...ids,id]:ids.filter(saved=>saved!==id);
+  try{save();}catch(error){settings.touchViewers=previous;throw error;}
+}
 async function listen(rotate=false,ip=settings.ip){
   if(opening)return;opening=true;
   try{
     server?.close();address='';qr='';notice='';
     await native.call('health');
     const ips=networks();if(!ips.includes(ip))ip=ips[0];if(!ip)throw Error('Connect this PC to the same local network as your phone, then retry.');
-    server=new Sharing({remaining:()=>license.remaining(),changed,startMedia,stopMedia,media,onFailure:message=>{notice=message;},sendInput:input=>native.call('input',input)});
+    server=new Sharing({touchAllowed,rememberTouch,remaining:()=>license.remaining(),changed,startMedia,stopMedia,media,onFailure:message=>{notice=message;},sendInput:input=>native.call('input',input)});
     await server.listen(ip,rotate?0:settings.port||0,viewer);
     settings.ip=ip;settings.port=server.server.address().port;save();address=server.address;
   }catch(e){notice=e.code==='EADDRINUSE'?'The saved port is busy. Choose another port below.':e.message;}finally{opening=false;changed();}
@@ -117,9 +125,13 @@ async function start(){
     try{
       switch(op){
         case 'state':return state();
-        case 'approve':await server.approve(value===true);break;
+        case 'approve':if(server.peer && value?.requestID===server.peer.requestID)await server.approve(value.enabled===true);break;
         case 'disconnect':server.reset();break;
-        case 'touch':if(server.peer?.ready){server.peer.grant=value===true?crypto.randomUUID():null;await native.call('release');}break;
+        case 'touch':
+          if(server.peer?.ready && value?.requestID===server.peer.requestID){
+            try{server.setTouch(server.peer,value.enabled===true);}finally{await native.call('release');}
+          }
+          break;
         case 'scrollSpeed':
           if(scrollSpeeds.includes(value)){
             await native.call('scrollSpeed',{pixelsPerNotch:value});
