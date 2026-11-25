@@ -1,0 +1,12 @@
+{
+  "id": "/",
+  "name": "Phone as a Second Monitor",
+  "short_name": "Second Monitor",
+  "start_url": "/",
+  "scope": "/",
+  "display_override": ["fullscreen", "standalone"],
+  "display": "standalone",
+  "background_color": "#090a10",
+  "theme_color": "#090a10",
+  "icons": [{ "src": "/display-icon.png", "sizes": "180x180", "type": "image/png" }]
+}

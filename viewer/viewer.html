@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#090a10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Phone as a Second Monitor">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/display.webmanifest">
+<link rel="apple-touch-icon" href="/display-icon.png">
+<link rel="icon" href="/display-icon.png">
+<title>Phone as a Second Monitor</title>
+<style>
+*{box-sizing:border-box} [hidden]{display:none!important}
+body{margin:0;background:#101928;color:#eff7ff;font-family:Roboto,"Helvetica Neue",sans-serif;font-size:16px}
+h1{font-size:36px;font-size:clamp(32px,8vw,48px);letter-spacing:-.045em;line-height:1.08;margin:2rem 0 12px}
+p{line-height:1.55;color:#c2d0df;margin:0 0 20px}label{display:block;font-weight:600;margin:24px 0 8px}
+input,button{font:inherit;border-radius:9px;padding:13px 16px}
+input{color:#eff7ff;background:#1e3046;border:1px solid #6c8097;font-size:22px;letter-spacing:.15em;width:100%}
+button{border:0;background:#aad9fc;color:#0d2638;font-weight:650;min-height:44px;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid white;outline-offset:3px}
+form button{width:100%;margin:12px 0 16px}
+details{margin-top:14px}summary{cursor:pointer;color:#c2d0df}select{padding:8px;font:inherit}
+.secondary{background:#28384c;color:#f4f8ff} #message{min-height:1.5em} #stage{position:fixed;top:0;right:0;bottom:0;left:0;background:#000;display:flex;align-items:center;justify-content:center}
+#surface,#awakeMedia,#picture,#movie{position:absolute;top:0;right:0;bottom:0;left:0}#surface{overflow:hidden}
+#surface.interactive{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#awakeMedia,#picture,#movie{width:100%;height:100%;object-fit:contain;pointer-events:none}
+#contact{position:fixed;top:-13px;left:-13px;width:26px;height:26px;box-sizing:border-box;border:2px solid white;border-radius:50%;box-shadow:0 0 0 1px #0009;pointer-events:none}
+#picture{background:#000}#movie{opacity:0}
+@supports(height:100dvh){#stage{bottom:auto;height:100dvh}}
+#menu,#toolbar,#keyboardBar,#feedback{background:#172435;color:#f2f6fa;box-shadow:0 4px 20px #0005}
+#menu{position:absolute;z-index:3;right:0;top:50%;transform:translateY(-50%);width:44px;height:58px;border:1px solid #687888;border-right:0;border-radius:15px 0 0 15px;padding:0}
+#menu:before{content:"";display:inline-block;width:10px;height:10px;border:solid currentColor;border-width:0 2px 2px 0;transform:rotate(135deg)}
+#menu[aria-expanded=true]:before{transform:rotate(-45deg)}
+#shade{position:absolute;inset:0;width:100%;height:100%;border-radius:0;background:#0003;padding:0}
+#toolbar{position:absolute;z-index:2;right:0;top:50%;width:min(284px,calc(100% - 50px));max-height:calc(100% - 16px);overflow:auto;padding:14px 54px 14px 14px;border:1px solid #627080;border-right:0;border-radius:16px 0 0 16px;visibility:hidden;transform:translate(100%,-50%);transition:transform .18s ease,visibility 0s .18s}
+#toolbar[data-open=true]{visibility:visible;transform:translate(0,-50%);transition-delay:0s}
+#toolbar button{display:block;text-align:left;width:100%;background:transparent;color:inherit;border-radius:8px;min-height:44px;padding:8px 10px}
+#toolbar button:hover,#toolbar button:focus-visible{background:#34455a}
+#toolbar button:disabled{opacity:.52}#toolbar #keyboard{background:#c2e6ff;color:#152b3c}
+#touchHint,#rate{display:block;color:#cfdae5;font-size:12px;line-height:1.45;margin:8px 6px}
+#rate{border-top:1px solid #516174;padding-top:10px}
+#imageQuality label{margin:10px 6px 4px;font-size:13px}
+#imageQuality select{width:100%;min-height:44px;color:inherit;background:#243449;border:1px solid #687888;border-radius:8px}
+#feedback{position:absolute;z-index:4;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 24px);border:1px solid #697b8d;border-radius:12px;padding:8px 12px;font-size:14px;pointer-events:none}
+#keyboardBar{position:absolute;z-index:4;bottom:0;left:0;right:0;border-top:1px solid #64768a;padding:2px max(4px,env(safe-area-inset-right)) 2px max(4px,env(safe-area-inset-left));font-size:14px}
+#typing,#passwordTyping{position:fixed;top:12px;left:50%;width:1px;height:1px;padding:0;border:0;opacity:0;clip-path:inset(50%);pointer-events:none;font-size:16px}
+#keyRow{display:flex;align-items:center;gap:4px;max-width:44rem;margin:auto}
+#keyStatus{display:block;text-align:center;font-size:12px;line-height:1.3;padding:2px 4px;color:#d0e0ed}
+#keyStatus:empty{display:none}
+#keyStrip{display:flex;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;touch-action:pan-x;gap:3px}
+#keyboardBar button{flex:none;min-width:44px;min-height:44px;padding:4px 7px}
+#keyStrip button{background:#293c51;color:white}
+#typingDone{margin-left:auto}
+#keyStrip button[aria-pressed=true]{background:#b2dfff;color:#11263a}
+@media(prefers-reduced-motion:reduce){#toolbar{transition:none}}
+#iosInstall{font-size:14px;line-height:1.45;margin:8px 0}
+#iosInstall summary{padding:10px 0}#iosInstall p{margin:4px 0 8px}
+#toolbar #iosInstall{padding:0 6px}
+#fullOffer{position:absolute;z-index:2;left:max(8px,env(safe-area-inset-left));bottom:max(8px,env(safe-area-inset-bottom));display:flex;align-items:center;background:#172435;border:1px solid #687888;border-radius:10px}
+#fullOffer button{background:transparent;color:#f2f6fa;min-width:44px;padding:8px 12px}
+#toolbar[data-open=true] ~ #fullOffer,#stage:has(#keyboardBar:not([hidden])) #fullOffer{display:none}
+@supports(padding:max(0px,env(safe-area-inset-right))){
+  main{padding-top:max(32px,env(safe-area-inset-top));padding-left:max(24px,env(safe-area-inset-left));padding-right:max(24px,env(safe-area-inset-right))}
+  #menu{width:calc(44px + env(safe-area-inset-right));padding-right:env(safe-area-inset-right)}
+  #toolbar{padding-right:calc(54px + env(safe-area-inset-right));max-height:calc(100% - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+}
+@media(max-height:455px){main{padding-top:15px}h1{margin:14px 0 8px}p{margin:0 0 8px}label{margin:10px 0 5px}}
+#demoClock{position:fixed;z-index:5;right:max(8px,env(safe-area-inset-right));top:max(8px,env(safe-area-inset-top));padding:5px 9px;border-radius:6px;background:#15202df0;color:white;font:600 13px/1.4 system-ui,sans-serif;font-variant-numeric:tabular-nums;pointer-events:none}
+
+body{background:#090a10}
+body:has(#setup:not([hidden])){background:radial-gradient(ellipse at 12% 0%,#18232e 0,transparent 45%),radial-gradient(ellipse at 98% 72%,#21192a 0,transparent 51%),#090a10;min-height:100vh;min-height:100dvh}
+#setup{--page-text:#f5f5f7;--page-dim:#b8b8c3;--page-rule:#393943;--page-accent:#cfbfff;box-sizing:border-box;width:min(100%,540px);margin:0 auto;padding:clamp(25px,7vh,74px) 26px max(28px,env(safe-area-inset-bottom));color:var(--page-text);font:400 16px/1.5 system-ui,-apple-system,sans-serif}
+#setup .brand{display:flex;align-items:center;gap:11px;margin:0 0 clamp(32px,6vh,66px);padding-bottom:16px;border-bottom:1px solid #ffffff26;color:var(--page-text);font-weight:620;letter-spacing:-.025em}
+.brand img{width:42px;height:42px;object-fit:contain;border-radius:11px}
+#setup h1{font-size:clamp(34px,7.3vw,54px);letter-spacing:-.055em;line-height:1.05;margin:0 0 14px;text-wrap:balance}
+#setup p{color:var(--page-dim);line-height:1.55;margin:0 0 20px}
+#setup label{margin:24px 0 7px;color:var(--page-text);font-size:.91rem;font-weight:620}
+#setup #code{background:#191b23;color:var(--page-text);border:1px solid #60616e;border-radius:13px;padding:13px 16px;width:100%;font:550 clamp(23px,5vw,30px)/1.25 ui-monospace,monospace;letter-spacing:.17em}
+#setup #code::placeholder{color:#a7a6b7;opacity:1}
+#setup form button,#setup .secondary{border-radius:100px;padding:13px 20px;min-height:48px}
+#setup form button{width:100%;margin:16px 0 0;background:#f5f5f7;color:#101016}
+#setup form button span{margin-left:.25em}
+#setup #codeError{color:#ffbcb2;margin:6px 0 0;font-size:.9rem}
+#setup #code[aria-invalid=true]{border-color:#ffbcb2}
+#setup .secondary{background:#23242d;color:var(--page-text);border:1px solid var(--page-rule)}
+#setup #message:empty{display:none}
+#setup #message:not(:empty){color:#e0d7fa;margin:18px 0 14px}
+#setup details{margin-top:16px;color:var(--page-dim)}
+#setup summary{color:var(--page-dim);font-size:.9rem;min-height:44px;line-height:24px;padding:10px 0}
+#setup select{background:#191b23;color:var(--page-text);border:1px solid var(--page-rule);border-radius:8px;min-height:44px}
+#setup :is(button,input,summary,select):focus-visible{outline:3px solid var(--page-accent);outline-offset:3px}
+@media(max-height:540px){#setup{padding-top:max(14px,env(safe-area-inset-top))}#setup .brand{margin-bottom:17px;padding-bottom:9px}.brand img{width:32px;height:32px}#setup h1{font-size:32px}#setup label{margin-top:12px}}
+@supports(padding:max(0px,env(safe-area-inset-right))){#setup{padding-left:max(26px,env(safe-area-inset-left));padding-right:max(26px,env(safe-area-inset-right))}}
+</style>
+</head>
+<body>
+<div id="demoClock" role="timer" aria-live="off" hidden></div>
+<main id="setup">
+<div class="brand"><img src="/display-icon.png" width="42" height="42" alt=""><span>Phone as a Second Monitor</span></div>
+<h1 id="title">Connect to your Mac</h1>
+<p id="hint">Join the same Wi-Fi as your Mac, then enter the 8-digit code from the Mac app.</p>
+<form id="form" novalidate><label for="code">Pairing code</label><input id="code" type="text" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="off" placeholder="00000000" aria-describedby="codeError" required><p id="codeError" role="alert" hidden>Enter the 8-digit code shown on your Mac.</p><button>Connect device <span aria-hidden="true">→</span></button><details id="fpsOptions" hidden><summary>Refresh rate</summary><label for="fps">Target FPS</label><select id="fps"><option value="auto">Match display</option><option value="120">120 FPS</option><option value="90">90 FPS</option><option value="60">60 FPS</option></select></details></form>
+<p id="message" role="status"></p><button id="afterDemo" class="secondary" hidden>Reconnect after unlocking</button><button id="cancel" class="secondary" hidden>Cancel</button>
+<details id="iosInstall" hidden><summary>Hide the address bar</summary><p>In Safari, choose Share → Add to Home Screen. If you see Open as Web App, turn it on.</p><p>End any active connection. Then open Phone as a Second Monitor from your Home Screen and enter the current code from your Mac.</p></details>
+</main>
+<div id="stage" hidden><div id="surface"><video id="awakeMedia" muted loop playsinline preload="none" src="/awake.mp4" disablepictureinpicture aria-hidden="true" hidden></video><img draggable="false" id="picture" alt="Extended computer display"><video id="movie" muted playsinline autoplay hidden aria-label="Extended computer display"></video><span id="contact" aria-hidden="true" hidden></span></div><button id="shade" aria-label="Close menu" tabindex="-1" hidden></button>
+<button id="menu" aria-label="Options" title="Options" aria-controls="toolbar" aria-expanded="false"></button>
+<nav id="toolbar" aria-label="Quick controls" aria-hidden="true" inert>
+<button id="keyboard" data-action="keyboard" hidden>Keyboard</button>
+<button data-action="rightClick" hidden>Right-click</button>
+<button data-action="dock" data-platform="macos" hidden>Show Dock</button>
+<button data-action="missionControl" data-platform="macos" hidden>Mission Control</button>
+<button data-action="start" data-platform="windows" hidden>Start menu</button>
+<button data-action="taskView" data-platform="windows" hidden>Task View</button>
+<p id="touchHint">Enable touch control on your computer.</p>
+<button id="awakeRetry" hidden>Keep screen awake</button>
+<div id="imageQuality" hidden><label for="quality">Picture quality</label><select id="quality"><option value="sharp">Sharper text</option><option value="fast">Faster response</option></select></div>
+<span id="rate">JPEG</span><button id="full">Full screen</button><button id="leave">Disconnect</button>
+</nav>
+<div id="fullOffer" hidden><button id="fullStart">Enter full screen</button><button id="fullDismiss" aria-label="Dismiss full screen tip">×</button></div>
+<div id="keyboardBar" hidden>
+<textarea id="typing" rows="1" aria-label="Computer keyboard" tabindex="-1" autocomplete="off" autocapitalize="sentences" maxlength="4096"></textarea>
+<input id="passwordTyping" type="password" aria-label="Computer password" tabindex="-1" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" hidden>
+<span id="keyStatus" role="status"></span>
+<div id="keyRow"><div id="keyStrip" role="group" aria-label="Shortcut keys" hidden><button id="primaryKey" aria-pressed="false">⌘</button><button id="shiftKey" aria-label="Shift" aria-pressed="false">⇧</button><button data-key="escape">Esc</button><button data-key="tab">Tab</button><button data-key="copy">Copy</button><button data-key="paste">Paste</button></div>
+<button id="startPassword" hidden>Enter password</button><button id="typingDone">Done</button></div></div>
+<div id="feedback" role="status" hidden></div></div>
+<script src="/controls.js"></script>
+<script src="/menu.js"></script>
+<script src="/video.js"></script>
+<script>
+(function () {
+  'use strict';
+  function el(id) { return document.getElementById(id); }
+  var token = '', drawn = '0', cycle = 0, pending, next, imageURL;
+  var storageKey = 'galaxy-display-session';
+  var demoUntil = 0, demoTimer = 0, demoCheck;
+  function showDemoPaywall() {
+    reset('');
+    el('title').textContent = 'Your free demo has ended';
+    el('hint').textContent = 'To continue sharing, open the Mac app and choose the one-time lifetime unlock or restore your purchase.';
+    el('form').hidden = true;
+    el('afterDemo').hidden = false;
+  }
+  el('afterDemo').onclick = function () { reset('Start pairing on your Mac and enter the new code.'); };
+  function clearDemo() {
+    clearTimeout(demoTimer);
+    if (demoCheck) demoCheck.abort();
+    demoCheck = null;
+    demoUntil = 0;
+    el('demoClock').hidden = true;
+  }
+  function drawDemo() {
+    clearTimeout(demoTimer);
+    var ms = demoUntil - Date.now();
+    if (ms <= 0) {
+      el('demoClock').textContent = 'Free demo 00:00';
+      // A purchase on the Mac may have just replaced the trial while video was in flight.
+      if (!demoCheck) {
+        var run = cycle;
+        demoCheck = request('GET', '/capabilities', {Authorization: 'Bearer ' + token}, false, function (reply) {
+          demoCheck = null;
+          if (run !== cycle || !demoUntil) return;
+          if (reply && reply.status === 200) {
+            var hostTime = reply.getResponseHeader('X-Demo-Remaining');
+            if (hostTime === null) { clearDemo(); return; }
+            if (Number(hostTime) > 0) {
+              demoUntil = Date.now() + Number(hostTime) * 1000;
+              drawDemo();
+              return;
+            }
+          }
+          showDemoPaywall();
+        });
+      }
+      return;
+    }
+    var seconds = Math.ceil(ms / 1000);
+    var label = 'Free demo ' + String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
+    if (el('demoClock').textContent !== label) el('demoClock').textContent = label;
+    el('demoClock').hidden = false;
+    demoTimer = setTimeout(drawDemo, Math.min(1000, Math.max(1, ms - (seconds - 1) * 1000)));
+  }
+  function syncDemo(raw) {
+    if (raw == null || raw === '') { if (demoUntil) clearDemo(); return; }
+    var seconds = Number(raw);
+    if (!Number.isInteger(seconds) || seconds < 0) return;
+    var deadline = Date.now() + seconds * 1000;
+    if (!demoUntil || Math.abs(deadline - demoUntil) >= 1000) {
+      demoUntil = deadline;
+      drawDemo();
+    }
+  }
+  el('fpsOptions').hidden = !window.GalaxyVideo;
+  var video, videoLive = false, videoAttempted = false, useVP8 = false;
+  var retryAt = 0, retryCount = 0, liveSince = 0;
+  var keepAwake = displayAwake(el('awakeMedia'), el('awakeRetry'));
+  var ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  function inputChannel() { return video && video.inputReady() ? video : null; }
+  var menu = quickMenu(el, function () { return token; }, function () { return touch; }, inputChannel);
+  var touch = displayTouch(el('surface'), function () { return el(videoLive ? 'movie' : 'picture'); },
+    function () { return token; }, el('touchHint'), menu.setGrant, menu.notify, menu.supports, menu.targetChanged, inputChannel);
+  var stableSize = '', candidateSize = '', sizeChangedAt = 0;
+  var quality = el('quality');
+  try { if (localStorage.getItem('galaxy-display-quality') === 'fast') quality.value = 'fast'; } catch (_) {}
+  quality.onchange = function () {
+    try { localStorage.setItem('galaxy-display-quality', quality.value); } catch (_) {}
+    viewport();
+  };
+  function viewport() {
+    if (menu.typing() && stableSize) return stableSize;
+    var bounds = el('stage').getBoundingClientRect();
+    var width = Math.round(bounds.width || window.innerWidth);
+    var height = Math.round(bounds.height || window.innerHeight);
+    var density = window.devicePixelRatio || 1;
+    el('imageQuality').hidden = !(density > 1 && Math.max(width, height) * density > 1280);
+    var size = width + 'x' + height + '@' + (quality.value === 'fast' ? 1 : density);
+    // Browser toolbars and fold animations can report intermediate sizes.
+    if (candidateSize !== size) {
+      candidateSize = size;
+      sizeChangedAt = Date.now();
+    }
+    if (!stableSize || Date.now() - sizeChangedAt >= 350) stableSize = size;
+    return stableSize;
+  }
+  function store(value) {
+    token = value;
+    try { if (value) sessionStorage.setItem(storageKey, value); else sessionStorage.removeItem(storageKey); } catch (_) {}
+  }
+  function request(method, path, headers, binary, callback) {
+    var req = new XMLHttpRequest();
+    req.open(method, path);
+    req.timeout = 6500;
+    Object.keys(headers).forEach(function (key) { req.setRequestHeader(key, headers[key]); });
+    if (binary) req.responseType = 'blob';
+    req.onload = function () { callback(req); };
+    req.onerror = req.ontimeout = function () { callback(null); };
+    req.send();
+    return req;
+  }
+  function readText(req, done) {
+    var reader = new FileReader();
+    reader.onload = function () { done(String(reader.result)); };
+    reader.onerror = function () { done('Reconnect your device.'); };
+    reader.readAsText(req.response);
+  }
+  function controls(open) {
+    menu.open(open);
+  }
+  function releaseImage() {
+    el('picture').onload = el('picture').onerror = null;
+    el('picture').removeAttribute('src');
+    if (imageURL) URL.revokeObjectURL(imageURL);
+    imageURL = null;
+  }
+  function waiting(text) {
+    keepAwake(false); touch.enable(''); menu.reset();
+    installHelp(false);
+    el('stage').hidden = true;
+    el('setup').hidden = false;
+    el('form').hidden = true;
+    el('hint').hidden = true;
+    el('cancel').hidden = !token;
+    el('title').textContent = 'Connecting';
+    el('message').textContent = text;
+  }
+  var pairingHint = el('hint').textContent;
+  function reset(text) {
+    clearDemo();
+    el('afterDemo').hidden = true;
+    el('hint').textContent = pairingHint;
+    keepAwake(false); touch.enable(''); menu.reset();
+    installHelp(false);
+    cycle++;
+    if (video) video.stop();
+    video = null;
+    videoLive = videoAttempted = useVP8 = false;
+    retryAt = retryCount = 0;
+    el('rate').textContent = 'JPEG';
+    if (isFullscreen()) exitFullscreen();
+    stableSize = candidateSize = '';
+    clearTimeout(next);
+    if (pending) pending.abort();
+    pending = null;
+    releaseImage();
+    drawn = '0';
+    store('');
+    controls(false);
+    el('stage').hidden = el('cancel').hidden = true;
+    el('form').hidden = el('hint').hidden = el('setup').hidden = false;
+    el('title').textContent = 'Connect to your Mac';
+    el('message').textContent = text;
+  }
+  function startVideo(run) {
+    if (!window.GalaxyVideo || video || (videoAttempted && (!retryAt || Date.now() < retryAt))) return;
+    if (document.hidden || (retryAt && menu.typing())) return;
+    retryAt = 0;
+    videoAttempted = true;
+    video = GalaxyVideo.start(token, viewport, function () {
+      if (run === cycle) { videoLive = true; liveSince = Date.now(); }
+    }, function (retryVP8) {
+      if (run !== cycle) return;
+      if (videoLive && Date.now() - liveSince >= 30000) retryCount = 0;
+      if (retryVP8 && !useVP8) { useVP8 = true; videoAttempted = false; }
+      else if ((videoLive || retryCount) && retryCount < 2) {
+        retryAt = Date.now() + 8000 * ++retryCount;
+      }
+      video = null;
+      videoLive = false;
+      drawn = '0';
+      el('rate').textContent = 'JPEG';
+    }, useVP8, function (value) { if (run === cycle) touch.enable(value); }, menu.channelClosed, function (value) { if (run === cycle) syncDemo(value); });
+  }
+  function poll() {
+    var run = cycle;
+    if (videoLive) { next = setTimeout(poll, 300); return; }
+    var headers = {Authorization: 'Bearer ' + token, 'X-Drawn': drawn, 'X-Viewport': viewport()};
+    if (videoAttempted && !video) headers['X-Use-JPEG'] = '1';
+    pending = request('GET', '/frame', headers, true, function (req) {
+      if (run !== cycle) return;
+      function again(delay) { next = setTimeout(poll, delay); }
+      if (req && req.status >= 200 && req.status < 300) {
+        syncDemo(req.getResponseHeader('X-Demo-Remaining'));
+        if (run !== cycle) return;
+      }
+      if (!req) {
+        if (video) video.stop();
+        video = null;
+        videoLive = videoAttempted = useVP8 = false;
+        retryAt = retryCount = 0;
+        el('rate').textContent = 'JPEG';
+        drawn = '0';
+        waiting('Connection interrupted. Checking your computer…');
+        return again(1200);
+      }
+      if (req.status === 402) { showDemoPaywall(); return; }
+      if (req.status === 204 || req.status === 200) touch.enable(req.getResponseHeader('X-Touch-Grant'));
+      if (req.status === 204) { startVideo(run); return again(32); }
+      if (req.status !== 200) {
+        return readText(req, function (msg) {
+          if (run !== cycle) return;
+          if (req.status === 202) { waiting(msg); again(450); }
+          else { reset(msg || 'Reconnect your device.'); }
+        });
+      }
+      var picture = el('picture'), frame = req.getResponseHeader('X-Frame');
+      var previous = imageURL;
+      imageURL = URL.createObjectURL(req.response);
+      picture.onload = function () {
+        if (previous) URL.revokeObjectURL(previous);
+        if (run !== cycle) return;
+        drawn = frame;
+        el('setup').hidden = true;
+        if (el('stage').hidden) {
+          el('stage').hidden = false;
+          syncFullscreen();
+        }
+        installHelp(true);
+        keepAwake(true);
+        menu.discover();
+        startVideo(run);
+        again(0);
+      };
+      picture.onerror = function () {
+        if (previous) URL.revokeObjectURL(previous);
+        leave('Your browser could not display the image. Try again.');
+      };
+      picture.src = imageURL;
+    });
+  }
+  function clearCodeError() {
+    el('codeError').hidden = true;
+    el('code').removeAttribute('aria-invalid');
+  }
+  el('code').addEventListener('input', clearCodeError);
+  function pair(ev) {
+    ev.preventDefault();
+    if (!el('code').validity.valid) {
+      el('codeError').hidden = false;
+      el('code').setAttribute('aria-invalid', 'true');
+      el('code').focus();
+      return;
+    }
+    clearCodeError();
+    var run = ++cycle;
+    offerFullscreen = true;
+    enterFullscreen();
+    el('code').blur();
+    waiting('Requesting a connection…');
+    var hz = Number(el('fps').value) || (window.GalaxyVideo ? GalaxyVideo.refreshHz() : 60);
+    pending = request('POST', '/pair', {'X-Pair-Code': el('code').value, 'X-Viewport': viewport(), 'X-Refresh-Hz': hz}, false, function (req) {
+      if (run !== cycle) return;
+      if (!req || req.status !== 200) return reset(req ? req.responseText : 'Computer unavailable. Check Wi-Fi and the address.');
+      store(req.responseText);
+      syncDemo(req.getResponseHeader('X-Demo-Remaining'));
+      if (run !== cycle) return;
+      el('code').value = '';
+      poll();
+    });
+  }
+  function leave(message) {
+    if (token) request('POST', '/leave', {Authorization: 'Bearer ' + token}, false, function () {});
+    reset(message);
+  }
+  el('form').onsubmit = pair;
+  // Handle the activating click directly, and retain form submission for keyboard users.
+  el('form').querySelector('button').onclick = pair;
+  el('cancel').onclick = el('leave').onclick = function () { leave('Connection ended. Use the code on your computer to reconnect.'); };
+
+  var target = document.documentElement;
+  var offerFullscreen = true;
+  function standalone() {
+    return navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  }
+  function installHelp(live) {
+    var help = el('iosInstall');
+    if (!ios || standalone()) { help.hidden = true; return; }
+    var parent = el(live ? 'toolbar' : 'setup');
+    if (help.parentNode !== parent) {
+      help.open = false;
+      parent.insertBefore(help, live ? el('full') : null);
+    }
+    help.hidden = false;
+  }
+  function supportsFullscreen() {
+    return (target.requestFullscreen && document.fullscreenEnabled !== false) ||
+      (target.webkitRequestFullscreen && document.webkitFullscreenEnabled !== false);
+  }
+  function isFullscreen() { return document.fullscreenElement || document.webkitFullscreenElement; }
+  function appFullscreen() {
+    return window.matchMedia('(display-mode: fullscreen)').matches || (ios && standalone());
+  }
+  function enterFullscreen(manual) {
+    if (isFullscreen() || appFullscreen() || !supportsFullscreen()) return;
+    var run = cycle;
+    function failed() {
+      if (run !== cycle) return;
+      syncFullscreen();
+      if (!manual) return;
+      if (ios) { controls(true); el('iosInstall').open = true; }
+      else menu.notify('Full screen was blocked. Open this address directly in your browser and try again.');
+    }
+    try {
+      var result = target.requestFullscreen && document.fullscreenEnabled !== false
+        ? target.requestFullscreen({navigationUI: 'hide'}) : target.webkitRequestFullscreen();
+      if (result && result.catch) result.catch(failed);
+    } catch (_) { failed(); }
+  }
+  function exitFullscreen() {
+    var exit = document.exitFullscreen || document.webkitExitFullscreen;
+    var result = exit && exit.call(document);
+    if (result && result.catch) result.catch(function () {});
+  }
+  function syncFullscreen() {
+    var full = isFullscreen();
+    if (full && !el('stage').hidden) offerFullscreen = false;
+    // An installed Android viewer may still show the status bar in standalone mode.
+    el('full').hidden = !full && (appFullscreen() || !supportsFullscreen());
+    el('full').textContent = isFullscreen() ? 'Exit full screen' : 'Full screen';
+    el('fullOffer').hidden = !offerFullscreen || !!full || appFullscreen();
+    el('fullStart').textContent = supportsFullscreen() ? 'Enter full screen' : (ios ? 'Hide address bar' : 'Full screen help');
+  }
+  el('fullStart').onclick = function () {
+    if (supportsFullscreen()) { enterFullscreen(true); return; }
+    if (ios) { controls(true); el('iosInstall').open = true; }
+    else menu.notify('For full screen, open this address directly in Chrome or another browser with full screen support.');
+  };
+  el('fullDismiss').onclick = function () { offerFullscreen = false; syncFullscreen(); };
+  document.addEventListener('fullscreenchange', syncFullscreen);
+  document.addEventListener('webkitfullscreenchange', syncFullscreen);
+  syncFullscreen();
+  installHelp(false);
+  el('full').onclick = function () {
+    controls(false);
+    if (isFullscreen()) exitFullscreen(); else enterFullscreen(true);
+  };
+  function readPairingLink() {
+    var qr = location.hash.slice(1);
+    if (!/^[0-9]{8}$/.test(qr)) return false;
+    history.replaceState(null, '', location.pathname);
+    if (!token && !el('form').hidden) {
+      clearCodeError();
+      el('code').value = qr;
+      el('hint').textContent = 'Your code is ready. Tap Connect device, then approve the connection on your Mac.';
+    }
+    return true;
+  }
+  window.addEventListener('hashchange', readPairingLink);
+  if (!readPairingLink()) {
+    try { token = sessionStorage.getItem(storageKey) || ''; } catch (_) {}
+    if (token) { waiting('Reconnecting to your Mac…'); poll(); }
+  }
+}());
+</script>
+</body></html>
