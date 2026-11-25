@@ -29,8 +29,24 @@ try {
     throw "Windows did not start the display adapter. PnP status: $($device.Status). Problem code: $problem."
   }
   Write-Host 'The Windows PnP manager started the virtual display adapter.'
-  $installed=Get-CimInstance Win32_PnPSignedDriver | Where-Object DeviceID -eq $instance
-  if(!$installed.IsSigned){throw 'Windows did not report a signed installed driver.'}
+  # Inspect the package bound to this instance; the WMI IsSigned projection
+  # can be absent for a newly registered root-enumerated UMDF adapter.
+  $inf=$null
+  for($i=0;$i -lt 15 -and !$inf;$i++){
+    $inf=(Get-PnpDeviceProperty -InstanceId $instance -KeyName DEVPKEY_Device_DriverInfPath -ErrorAction SilentlyContinue).Data
+    if(!$inf){Start-Sleep -Seconds 1}
+  }
+  $provider=(Get-PnpDeviceProperty -InstanceId $instance -KeyName DEVPKEY_Device_DriverProvider -ErrorAction SilentlyContinue).Data
+  Write-Host "::notice::The installed adapter reports INF '$inf', provider '$provider' and status '$($device.Status)'."
+  if($inf -notmatch '^oem[0-9]+\.inf$' -or $provider -ne 'MikeTheTech'){throw "The registered adapter is not bound to the expected virtual display package (INF '$inf', provider '$provider')."}
+  $driver=Get-WindowsDriver -Online -Driver $inf
+  $store=Split-Path $driver.OriginalFileName
+  foreach($file in @('mttvdd.cat','MttVDD.dll','MttVDD.inf')){
+    if((Get-FileHash "$store/$file").Hash -ne (Get-FileHash "$app/driver/$file").Hash){throw "Installed driver store file differs from the pinned upstream package: $file"}
+  }
+  $signature=Get-AuthenticodeSignature "$store/mttvdd.cat"
+  if($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*SignPath Foundation*'){throw "The installed driver catalog is not valid: $($signature.Status)."}
+  Write-Host '::notice::Verified the running adapter, installed driver files and SignPath catalog in the Windows driver store.'
   $result='{"id":1,"op":"check"}' | & "$app\resources\MonitorHost.exe"
   if($LASTEXITCODE -or !($result | ConvertFrom-Json).PSObject.Properties['result']){throw 'The native helper failed.'}
   if ($env:PASM_TEST_DESKTOP -eq '1') {
