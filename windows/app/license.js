@@ -11,7 +11,7 @@ class License {
     this.deadline=performance.now()+Math.min(1200000,Math.max(0,this.data.first+1200000-Date.now()));
   }
   save(){fs.writeFileSync(this.file+'.tmp',this.storage.encryptString(JSON.stringify(this.data)));fs.renameSync(this.file+'.tmp',this.file);}
-  remaining(){const now=Date.now();if(this.data.until>now && now>=this.data.first)return null;
+  remaining(){const now=Date.now();if(now<this.data.first)return 0;if(this.data.until>now)return null;
     return Math.max(0,Math.ceil(Math.min(this.deadline-performance.now(),this.data.first+1200000-now)/1000));}
   async check(recovery){
     if(this.checking)throw Error('A purchase check is already running.');

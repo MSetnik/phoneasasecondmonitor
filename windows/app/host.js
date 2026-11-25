@@ -5,7 +5,7 @@ function render(s){
  const copy={
  pairing:['Step 1 of 3','Connect your phone','Join the same Wi-Fi network, then scan the QR code with your phone camera.'],
  approval:['Step 2 of 3','Approve this device','A device at '+s.ip+' wants to use the second display.'],
- preparing:['Step 3 of 3','Preparing the monitor','Windows is extending your desktop and starting video capture.'],
+ preparing:['Step 3 of 3','Preparing the monitor','Windows is extending your desktop. Waiting for the first frame on your phone.'],
  live:['Connected','Your second monitor is ready','Drag a window onto the new display. Use the chevron on your phone for the keyboard and shortcuts.'],
  failed:['Connection interrupted','The monitor could not start','Check Windows Display settings and try again.'],
  offline:['Connection setup','Connect to your local network','Use the connection settings below to retry or choose another port.'],

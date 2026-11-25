@@ -23,7 +23,10 @@ jobs:
           name: Windows-x64-installer
           path: dist/*.exe
           if-no-files-found: error
-      - name: Install, verify the signed device and uninstall on a clean Windows VM
+      - name: Install, pair a browser, verify video and uninstall on a clean Windows VM
+        timeout-minutes: 5
+        env:
+          PASM_TEST_DESKTOP: '1'
         shell: powershell
         run: |
           try { ./windows/tests/install.ps1 } catch { Write-Host "::error::$($_.Exception.Message)"; throw }

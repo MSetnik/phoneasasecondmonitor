@@ -17,7 +17,7 @@ internal static class Host {
     [StructLayout(LayoutKind.Explicit,Size=40)] struct Key { [FieldOffset(0)] public uint type; [FieldOffset(8)] public ushort vk; [FieldOffset(10)] public ushort scan; [FieldOffset(12)] public uint flags; }
     [DllImport("user32",SetLastError=true)] static extern uint SendInput(uint count,Key[] keys,int size);
     static string lease; static int step; static AutomationElement field; static IntPtr window;
-    static bool secret,dragging; static Adapter.Area area;
+    static DateTime lastDrag; static bool secret,dragging; static Adapter.Area area;
     static readonly JavaScriptSerializer json=new JavaScriptSerializer {MaxJsonLength=100000};
     static string S(Dictionary<string,object> d,string k){return d.ContainsKey(k)?Convert.ToString(d[k],CultureInfo.InvariantCulture):"";}
     static double N(Dictionary<string,object> d,string k,double min,double max){
@@ -87,10 +87,11 @@ internal static class Host {
         int x=area.x+(int)Math.Round(N(d,"x",0,1)*(area.width-1)),y=area.y+(int)Math.Round(N(d,"y",0,1)*(area.height-1));
         if(!SetCursorPos(x,y))return Reply(409,"Windows blocked pointer input.");
         switch(action){
-            case "point":case "move":break;
+            case "point":break;
+            case "move":lastDrag=DateTime.UtcNow;break;
             case "tap":mouse_event(2,0,0,0,UIntPtr.Zero);mouse_event(4,0,0,0,UIntPtr.Zero);break;
             case "rightClick":mouse_event(8,0,0,0,UIntPtr.Zero);mouse_event(16,0,0,0,UIntPtr.Zero);break;
-            case "down":mouse_event(2,0,0,0,UIntPtr.Zero);dragging=true;break;
+            case "down":mouse_event(2,0,0,0,UIntPtr.Zero);dragging=true;lastDrag=DateTime.UtcNow;break;
             case "up":Release();break;
             case "scroll":
                 int dx=(int)Math.Round(-N(d,"dx",-2,2)*area.width*2),dy=(int)Math.Round(N(d,"dy",-2,2)*area.height*2);
@@ -111,7 +112,7 @@ internal static class Host {
                     var d=json.Deserialize<Dictionary<string,object>>(line); id=(int)d["id"];
                     switch(S(d,"op")){
                         case "attach":Release();area=Adapter.Attach((int)N(d,"width",320,4096),(int)N(d,"height",320,4096),(int)N(d,"fps",30,120));result=area;break;
-                        case "check":area=Adapter.Current();result=area;break;
+                        case "check":if(dragging && (DateTime.UtcNow-lastDrag).TotalSeconds>2.5)Release();area=Adapter.Current();result=area;break;
                         case "detach":Release();Adapter.Detach();area=null;result=true;break;
                         case "release":Release();result=true;break;
                         case "input":result=Input((Dictionary<string,object>)d["body"],S(d,"kind")=="keyboard",d.ContainsKey("encrypted") && (bool)d["encrypted"]);break;

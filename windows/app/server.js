@@ -40,7 +40,7 @@ class Sharing {
   }
   async resize(p,size){
     if(p.busy||this.peer!==p)return;
-    p.size=size;p.busy=true;p.ready=false;p.offer=null;p.videoID=null;p.frame=null;
+    p.size=size;p.busy=true;p.ready=false;p.delivered=false;p.offer=null;p.videoID=null;p.frame=null;
     try {const area=await this.startMedia(size,p);if(this.peer===p){p.area=area;p.ready=true;}}
     catch(e){if(this.peer===p){p.error=e.message;this.stopMedia();}}
     finally{p.busy=false;this.changed();}
@@ -98,6 +98,8 @@ class Sharing {
       if(size.width!==p.size.width || size.height!==p.size.height){void this.resize(p,size);return reply(route==='/frame'?202:409,'Resizing your monitor…');}
     }
     if(method==='GET'&&route==='/frame'){
+      const drawn=Number(h['x-drawn']);
+      if(!p.delivered && Number.isInteger(drawn) && drawn>0 && drawn<=p.seq){p.delivered=true;this.changed();}
       if(!p.frame && !p.pendingFrame){
         p.pendingFrame=this.media('jpeg').then(bytes=>{if(p===this.peer && bytes?.length){p.frame=Buffer.from(bytes);p.seq++;}}).finally(()=>{p.pendingFrame=null;});
       }
@@ -116,6 +118,7 @@ class Sharing {
     if(method==='POST'&&route==='/video-answer'){const sdp=await read(req);if(!sdp.startsWith('v=0')||p!==this.peer)return reply(400);await this.media('answer',{id:p.videoID,sdp});return reply(204);}
     if(method==='POST'&&route==='/video-stop'){p.videoID=null;await this.media('closePeer');return reply(204);}
     if(method==='GET'&&route==='/video-status'){
+      if(!p.delivered && h['x-video-playing']==='1'){p.delivered=true;this.changed();}
       const stats=await this.media('stats',{detail:Math.max(0,Math.min(2,Number(h['x-video-detail'])||0))});
       if(p!==this.peer||this.remaining()===0)return reply(403);
       return reply(200,[p.area.fps,stats.fps,stats.moving?1:0].join(','),'text/plain',grant);

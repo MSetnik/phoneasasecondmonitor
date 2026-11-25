@@ -53,7 +53,7 @@
     async function call(method, path, body) {
       var headers = {Authorization: 'Bearer ' + token, 'X-Viewport': viewport()};
       if (id) headers['X-Video-ID'] = id;
-      if (path === '/video-status') headers['X-Video-Detail'] = String(detail);
+      if (path === '/video-status') { headers['X-Video-Detail'] = String(detail); if (live) headers['X-Video-Playing'] = '1'; }
       var abort = window.AbortController && new AbortController();
       var timer = abort && setTimeout(function () { abort.abort(); }, 5500);
       try {
