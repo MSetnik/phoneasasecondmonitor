@@ -20,3 +20,12 @@ The host attaches only its own adapter and checks that Windows has extended the 
 The 20-minute trial begins on first launch. The website edition uses the existing MCODE production license endpoint, Stripe Checkout and recovery codes. The PC protects its saved license with Windows DPAPI through Electron safeStorage. Never commit a recovery code, certificate or Stripe credential. Uninstall preserves the trial start and license in the Windows profile.
 
 The Windows workflow checks the client/host protocol, builds the native helper and installer, verifies the upstream catalog, tests WebRTC video and the input data channel between two browsers, then exercises installation, native display capture and removal on a Windows runner. Before public release, test the installer with standard Windows security settings on consumer Windows hardware, pair Android and iOS, check moving a window and typing into the extended display, and sign the website installer with the publisher's Authenticode identity. See the workflow run for actual verification status.
+
+To refresh the Windows test download on its dedicated Firebase preview channel:
+
+```sh
+python windows/scripts/stage-preview.py
+firebase hosting:channel:deploy windows-x64 --project phone-as-monitor-mcode --config firebase.windows-preview.json --expires 30d --no-authorized-domains
+```
+
+The live marketing site is released separately. The test build uses production billing. Testing the display during the demo is free.

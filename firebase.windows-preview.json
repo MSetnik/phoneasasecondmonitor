@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "site": "phone-as-monitor-mcode",
+    "public": "out/web-preview/public",
+    "headers": [
+      {"source":"**","headers":[{"key":"X-Robots-Tag","value":"noindex, nofollow"},{"key":"Cache-Control","value":"no-store"}]},
+      {"source":"**/*.exe","headers":[{"key":"Content-Disposition","value":"attachment"},{"key":"X-Content-Type-Options","value":"nosniff"}]}
+    ]
+  }
+}
