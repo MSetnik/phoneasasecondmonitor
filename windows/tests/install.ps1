@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/driver-consent.ps1"
+. "$PSScriptRoot/driver-baseline.ps1"
 $setup=(Get-ChildItem dist/*Setup.exe).FullName
 $result=Start-Process $setup -ArgumentList '/S' -PassThru
 $limit=(Get-Date).AddSeconds(100)
@@ -63,6 +64,10 @@ try {
     if ($LASTEXITCODE) {throw ("Extended desktop test: " + ($lines -join ' '))}
     Write-Host $lines
   }
+}catch{
+  $failure=$_
+  try{Test-UpstreamMonitor}catch{Write-Host "::notice::Vendor baseline diagnostics: $($_.Exception.Message)"}
+  throw $failure
 }finally{
   $remove=Start-Process "$app/Uninstall.exe" -ArgumentList "/S _?=$app" -Wait -PassThru
   if($remove.ExitCode -ne 0){throw "Uninstall exited with $($remove.ExitCode)."}
