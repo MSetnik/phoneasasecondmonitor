@@ -101,11 +101,11 @@ body:has(#setup:not([hidden])){background:radial-gradient(ellipse at 12% 0%,#182
 <div id="demoClock" role="timer" aria-live="off" hidden></div>
 <main id="setup">
 <div class="brand"><img src="/display-icon.png" width="42" height="42" alt=""><span>Phone as a Second Monitor</span></div>
-<h1 id="title">Connect to your Mac</h1>
-<p id="hint">Join the same Wi-Fi as your Mac, then enter the 8-digit code from the Mac app.</p>
-<form id="form" novalidate><label for="code">Pairing code</label><input id="code" type="text" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="off" placeholder="00000000" aria-describedby="codeError" required><p id="codeError" role="alert" hidden>Enter the 8-digit code shown on your Mac.</p><button>Connect device <span aria-hidden="true">→</span></button><details id="fpsOptions" hidden><summary>Refresh rate</summary><label for="fps">Target FPS</label><select id="fps"><option value="auto">Match display</option><option value="120">120 FPS</option><option value="90">90 FPS</option><option value="60">60 FPS</option></select></details></form>
+<h1 id="title">Connect to your PC</h1>
+<p id="hint">Join the same Wi-Fi as your PC, then enter the 8-digit code from the Windows app.</p>
+<form id="form" novalidate><label for="code">Pairing code</label><input id="code" type="text" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="off" placeholder="00000000" aria-describedby="codeError" required><p id="codeError" role="alert" hidden>Enter the 8-digit code shown on your PC.</p><button>Connect device <span aria-hidden="true">→</span></button><details id="fpsOptions" hidden><summary>Refresh rate</summary><label for="fps">Target FPS</label><select id="fps"><option value="auto">Match display</option><option value="120">120 FPS</option><option value="90">90 FPS</option><option value="60">60 FPS</option></select></details></form>
 <p id="message" role="status"></p><button id="afterDemo" class="secondary" hidden>Reconnect after unlocking</button><button id="cancel" class="secondary" hidden>Cancel</button>
-<details id="iosInstall" hidden><summary>Hide the address bar</summary><p>In Safari, choose Share → Add to Home Screen. If you see Open as Web App, turn it on.</p><p>End any active connection. Then open Phone as a Second Monitor from your Home Screen and enter the current code from your Mac.</p></details>
+<details id="iosInstall" hidden><summary>Hide the address bar</summary><p>In Safari, choose Share → Add to Home Screen. If you see Open as Web App, turn it on.</p><p>End any active connection. Then open Phone as a Second Monitor from your Home Screen and enter the current code from your PC.</p></details>
 </main>
 <div id="stage" hidden><div id="surface"><video id="awakeMedia" muted loop playsinline preload="none" src="/awake.mp4" disablepictureinpicture aria-hidden="true" hidden></video><img draggable="false" id="picture" alt="Extended computer display"><video id="movie" muted playsinline autoplay hidden aria-label="Extended computer display"></video><span id="contact" aria-hidden="true" hidden></span></div><button id="shade" aria-label="Close menu" tabindex="-1" hidden></button>
 <button id="menu" aria-label="Options" title="Options" aria-controls="toolbar" aria-expanded="false"></button>
@@ -142,11 +142,11 @@ body:has(#setup:not([hidden])){background:radial-gradient(ellipse at 12% 0%,#182
   function showDemoPaywall() {
     reset('');
     el('title').textContent = 'Your free demo has ended';
-    el('hint').textContent = 'To continue sharing, open the Mac app and choose the one-time lifetime unlock or restore your purchase.';
+    el('hint').textContent = 'To continue sharing, open the Windows app and choose the one-time lifetime unlock or restore your purchase.';
     el('form').hidden = true;
     el('afterDemo').hidden = false;
   }
-  el('afterDemo').onclick = function () { reset('Start pairing on your Mac and enter the new code.'); };
+  el('afterDemo').onclick = function () { reset('Start pairing on your PC and enter the new code.'); };
   function clearDemo() {
     clearTimeout(demoTimer);
     if (demoCheck) demoCheck.abort();
@@ -159,7 +159,7 @@ body:has(#setup:not([hidden])){background:radial-gradient(ellipse at 12% 0%,#182
     var ms = demoUntil - Date.now();
     if (ms <= 0) {
       el('demoClock').textContent = 'Free demo 00:00';
-      // A purchase on the Mac may have just replaced the trial while video was in flight.
+      // A purchase on the PC may have just replaced the trial while video was in flight.
       if (!demoCheck) {
         var run = cycle;
         demoCheck = request('GET', '/capabilities', {Authorization: 'Bearer ' + token}, false, function (reply) {
@@ -293,7 +293,7 @@ body:has(#setup:not([hidden])){background:radial-gradient(ellipse at 12% 0%,#182
     controls(false);
     el('stage').hidden = el('cancel').hidden = true;
     el('form').hidden = el('hint').hidden = el('setup').hidden = false;
-    el('title').textContent = 'Connect to your Mac';
+    el('title').textContent = 'Connect to your PC';
     el('message').textContent = text;
   }
   function startVideo(run) {
@@ -486,14 +486,14 @@ body:has(#setup:not([hidden])){background:radial-gradient(ellipse at 12% 0%,#182
     if (!token && !el('form').hidden) {
       clearCodeError();
       el('code').value = qr;
-      el('hint').textContent = 'Your code is ready. Tap Connect device, then approve the connection on your Mac.';
+      el('hint').textContent = 'Your code is ready. Tap Connect device, then approve the connection on your PC.';
     }
     return true;
   }
   window.addEventListener('hashchange', readPairingLink);
   if (!readPairingLink()) {
     try { token = sessionStorage.getItem(storageKey) || ''; } catch (_) {}
-    if (token) { waiting('Reconnecting to your Mac…'); poll(); }
+    if (token) { waiting('Reconnecting to your PC…'); poll(); }
   }
 }());
 </script>

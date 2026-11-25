@@ -140,7 +140,7 @@ function quickMenu(el, getToken, touch, getChannel) {
         s.sawKeyboard = false; s.initialHeight = 0;
         resetBuffer(s); typing.value = ''; typing.blur(); typing.hidden = true;
         el('keyStrip').hidden = true; startPassword.hidden = false;
-        el('keyStatus').textContent = 'A password field is selected on your Mac.';
+        el('keyStatus').textContent = 'A password field is selected on your PC.';
         return;
       }
       if (!s.lease) {
@@ -306,7 +306,7 @@ function quickMenu(el, getToken, touch, getChannel) {
     passwordTyping.value = marker;
     passwordTyping.focus({preventScroll:true});
     passwordTyping.setSelectionRange(1, 1);
-    el('keyStatus').textContent = 'Typing into the password field on your Mac.';
+    el('keyStatus').textContent = 'Typing into the password field on your PC.';
   };
   function passwordKey(action, text) {
     var s = session;
@@ -389,7 +389,7 @@ function quickMenu(el, getToken, touch, getChannel) {
     channelClosed:function (channel) {
       if (session && session.channel === channel) {
         detach(session);
-        notify('Keyboard connection ended. Check the text on your Mac.');
+        notify('Keyboard connection ended. Check the text on your PC.');
       }
     },
     targetChanged:targetChanged, supports:function (name) { return actions.indexOf(name) >= 0; }, typing:function () { return !!session; }};
