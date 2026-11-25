@@ -5,6 +5,7 @@ on:
     paths:
       - 'windows/tests/driver-consent.ps1'
       - 'windows/tests/install.ps1'
+      - 'windows/tests/display.cjs'
       - '.github/workflows/test-download.yml'
 permissions:
   contents: read
