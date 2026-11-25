@@ -40,6 +40,23 @@ internal static class ProjectionTest {
         Expect(Adapter.CanUseSystemExtend(paths, 117, row => false), false, "Require positive ownership.");
     }
     static int Main(string[] args) {
+        var wheel = new SwipeWheel();
+        int x, y, vertical = 0;
+        for (int i = 0; i < 120; i++) {
+            wheel.Move(0,-1,out x,out y);
+            vertical+=y;
+        }
+        Expect(vertical == -5, true, "Short updates must produce five notches over a 120-pixel swipe.");
+        // Use exactly representable sub-pixel fractions for the axis and batching assertions.
+        wheel.Reset();
+        wheel.Move(30,60,out x,out y);
+        Expect(x==-1 && y==2,true,"Natural scrolling on both axes.");
+        wheel.Move(-30,-60,out x,out y);
+        Expect(x==1 && y==-2,true,"Reversing direction returns to the initial position.");
+        wheel.Move(0,12,out x,out y);
+        wheel.Reset();
+        wheel.Move(0,12,out x,out y);
+        Expect(y==0,true,"A new gesture must not inherit an old fraction.");
         CheckLayouts();
         Console.WriteLine("Projection policy passed for two, disconnected and multiple targets.");
         if (args.Length == 0) return 0;

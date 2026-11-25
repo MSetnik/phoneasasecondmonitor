@@ -98,8 +98,9 @@ function displayTouch(surface, currentImage, getToken, hint, onGrant, notify, su
     }
     if (channel) channel.touch(grant, command, complete); else postHTTP(command, complete);
   }
-  function enqueue(action, p, dx, dy) {
+  function enqueue(action, p, dx, dy, beginScroll) {
     if (!grant) return;
+    if (beginScroll) motionTail = null;
     var last = queue[queue.length - 1];
     if (last && last === motionTail && last.action === action && (action === 'move' || action === 'scroll')) {
       last.x = p.x; last.y = p.y;
@@ -109,6 +110,7 @@ function displayTouch(surface, currentImage, getToken, hint, onGrant, notify, su
       }
     } else {
       motionTail = {action: action, x: p.x, y: p.y, dx: dx, dy: dy};
+      if (beginScroll) motionTail.beginScroll = true;
       queue.push(motionTail);
     }
     pump();
@@ -184,7 +186,10 @@ function displayTouch(surface, currentImage, getToken, hint, onGrant, notify, su
     var dx = p.x - pointer.last.x, dy = p.y - pointer.last.y;
     if (dx || dy) {
       if (pointer.mode === 'drag') enqueue('move', p);
-      else enqueue('scroll', pointer.start, dx, dy);
+      else {
+        enqueue('scroll', pointer.start, dx, dy, !pointer.scrolled);
+        pointer.scrolled = true;
+      }
     }
     pointer.last = p;
   }

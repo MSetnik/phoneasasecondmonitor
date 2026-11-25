@@ -2,6 +2,37 @@
 const { _electron,chromium }=require('playwright-core');
 const path=require('node:path');
 const assert=require('node:assert/strict');
+async function checkTouchScroll(host,phone){
+  await host.evaluate(async({BrowserWindow,screen})=>{
+    const display=screen.getAllDisplays().find(d=>d.id!==screen.getPrimaryDisplay().id);
+    if(!display)throw Error('The scroll test needs the extended desktop.');
+    const win=new BrowserWindow({...display.bounds,frame:false,show:false,webPreferences:{sandbox:true}});
+    global.scrollTestWindow=win;
+    await win.loadURL('data:text/html,<meta charset=utf-8><body style="margin:0;height:12000px">Scroll target');
+    win.show();win.focus();
+  });
+  try{
+    await phone.locator('#surface.interactive').waitFor();
+    const rect=await phone.locator('#surface').boundingBox();
+    const x=rect.x+rect.width*.4,y=rect.y+rect.height*.55;
+    const session=await phone.context().newCDPSession(phone);
+    await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+    for(let i=1;i<=24;i++){
+      await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y-i*3}]});
+    }
+    await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    await session.detach();
+    let scroll=0;
+    for(let i=0;i<30 && scroll<60;i++){
+      await new Promise(r=>setTimeout(r,100));
+      scroll=await host.evaluate(()=>global.scrollTestWindow.webContents.executeJavaScript('window.scrollY'));
+    }
+    assert.ok(scroll>=60,'A 72 CSS pixel swipe moved the Windows page only '+scroll+' CSS pixels.');
+    console.log('A 72 CSS pixel touchscreen swipe scrolled the page on the extended Windows desktop by '+scroll+' CSS pixels.');
+  }finally{
+    await host.evaluate(()=>{global.scrollTestWindow.destroy();delete global.scrollTestWindow;});
+  }
+}
 async function main(){
   const executablePath=path.join(process.env.ProgramFiles,'MCODE','Phone as a Second Monitor','PhoneAsMonitor.exe');
   const host=await _electron.launch({executablePath,timeout:35000});
@@ -38,6 +69,7 @@ async function main(){
     }
     await phone.waitForFunction(()=>document.querySelector('#movie').readyState>=2 && document.querySelector('#movie').currentTime>0.25,{},{timeout:25000});
     assert.equal(await control.locator('#heading').innerText(),'Your second monitor is ready');
+    await checkTouchScroll(host,phone);
     await phone.locator('#menu').click();
     await phone.locator('[data-action=start]').waitFor();
     assert.equal(await phone.locator('[data-action=dock]').isVisible(),false);

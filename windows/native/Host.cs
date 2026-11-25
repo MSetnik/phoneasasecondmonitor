@@ -31,7 +31,12 @@ internal static class Host {
     }
     static void Press(int k,bool unicode=false){KeyEvent(k,false,unicode);KeyEvent(k,true,unicode);}
     static void Chord(int modifier,int key){KeyEvent(modifier);try{Press(key);}finally{KeyEvent(modifier,true);}}
-    static void Release(){if(dragging)mouse_event(4,0,0,0,UIntPtr.Zero);dragging=false;lease=null;field=null;}
+    static readonly SwipeWheel wheel=new SwipeWheel();
+    static void SendWheel(uint flag,int notches) {
+        int delta=Math.Sign(notches)*120;
+        for(int i=0;i<Math.Abs(notches);i++)mouse_event(flag,0,0,delta,UIntPtr.Zero);
+    }
+    static void Release(){wheel.Reset();if(dragging)mouse_event(4,0,0,0,UIntPtr.Zero);dragging=false;lease=null;field=null;}
     static bool OnDisplay(){
         if(area==null)return false;
         return MonitorFromWindow(GetForegroundWindow(),0)==MonitorFromPoint(new System.Drawing.Point(area.x+area.width/2,area.y+area.height/2),0);
@@ -94,8 +99,11 @@ internal static class Host {
             case "down":mouse_event(2,0,0,0,UIntPtr.Zero);dragging=true;lastDrag=DateTime.UtcNow;break;
             case "up":Release();break;
             case "scroll":
-                int dx=(int)Math.Round(-N(d,"dx",-2,2)*area.width*2),dy=(int)Math.Round(N(d,"dy",-2,2)*area.height*2);
-                if(dx!=0)mouse_event(0x1000,0,0,dx,UIntPtr.Zero);if(dy!=0)mouse_event(0x800,0,0,dy,UIntPtr.Zero);break;
+                object first;
+                if(d.TryGetValue("beginScroll",out first) && true.Equals(first))wheel.Reset();
+                int dx,dy;
+                wheel.Move(N(d,"dx",-2,2)*area.width,N(d,"dy",-2,2)*area.height,out dx,out dy);
+                SendWheel(0x1000,dx);SendWheel(0x800,dy);break;
             default:return Reply(400);
         }
         return Reply(204);

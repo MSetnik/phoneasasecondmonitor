@@ -6,7 +6,7 @@ $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $refs = "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
 if (!(Test-Path "$refs/UIAutomationClient.dll")) { throw 'Install the .NET Framework 4.8 Developer Pack.' }
 $libs = 'mscorlib.dll,System.dll,System.Core.dll,System.Drawing.dll,System.Windows.Forms.dll,System.Web.Extensions.dll,UIAutomationClient.dll,UIAutomationTypes.dll,WindowsBase.dll'
-& $csc /nologo /noconfig /nostdlib+ /platform:x64 /optimize+ /out:out\MonitorHost.exe "/lib:$refs" "/reference:$libs" windows\native\Host.cs windows\native\Adapter.cs | ForEach-Object { Write-Host $_; if ($_ -match "error CS") { Write-Host "::error::$_" } }
+& $csc /nologo /noconfig /nostdlib+ /platform:x64 /optimize+ /out:out\MonitorHost.exe "/lib:$refs" "/reference:$libs" windows\native\Host.cs windows\native\Adapter.cs windows\native\SwipeWheel.cs | ForEach-Object { Write-Host $_; if ($_ -match "error CS") { Write-Host "::error::$_" } }
 if ($LASTEXITCODE) { throw "Native helper compilation failed with exit code $LASTEXITCODE." }
 npm ci --prefix windows/app --ignore-scripts --no-audit --no-fund
 if ($LASTEXITCODE) { throw 'Dependency installation failed.' }
