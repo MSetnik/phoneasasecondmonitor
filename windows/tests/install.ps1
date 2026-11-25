@@ -51,6 +51,12 @@ try {
   if($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*SignPath Foundation*'){throw "The installed driver catalog is not valid: $($signature.Status)."}
   Write-Host '::notice::Verified the running adapter, installed driver files and SignPath catalog in the Windows driver store.'
   $children=(Get-PnpDeviceProperty -InstanceId $instance -KeyName DEVPKEY_Device_Children -ErrorAction SilentlyContinue).Data
+  $settings=(Get-ItemProperty 'HKLM:\SOFTWARE\MikeTheTech\VirtualDisplayDriver' -ErrorAction SilentlyContinue).VDDPATH
+  if($settings -and (Test-Path "$settings/vdd_settings.xml")){
+    $hash=(Get-FileHash "$settings/vdd_settings.xml").Hash
+    $activePreset=if($hash -eq (Get-FileHash "$app/driver/vdd_defaults.xml").Hash){'vendor defaults'}else{'phone modes'}
+    Write-Host "::notice::The installed driver loaded the $activePreset configuration; monitor child '$($children -join ', ')'."
+  }
   $monitors=@(Get-PnpDevice -PresentOnly -Class Monitor -ErrorAction SilentlyContinue | ForEach-Object {$_.InstanceId})
   $gpus=@(Get-CimInstance Win32_VideoController | ForEach-Object {$_.Name})
   Write-Host "::notice::Windows test graphics: $($gpus -join ', '); monitor children on our adapter: $($children -join ', '); present monitors: $($monitors -join ', ')."
