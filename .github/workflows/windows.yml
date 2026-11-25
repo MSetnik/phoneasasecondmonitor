@@ -1,5 +1,18 @@
 name: Windows installer
-on: [push, workflow_dispatch]
+on:
+  workflow_dispatch:
+  push:
+    paths-ignore:
+      - 'windows/tests/driver-consent.ps1'
+      - 'windows/tests/install.ps1'
+      - '.github/workflows/test-download.yml'
+      - 'README.md'
+      - 'windows/website/**'
+      - 'windows/scripts/stage-preview.py'
+      - 'firebase.windows-preview.json'
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -32,6 +45,7 @@ jobs:
         timeout-minutes: 5
         env:
           PASM_TEST_DESKTOP: '1'
+          PASM_RUNNER_KIND: ${{ runner.environment }}
         shell: powershell
         run: |
           try { ./windows/tests/install.ps1 } catch { Write-Host "::error::$($_.Exception.Message)"; throw }

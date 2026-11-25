@@ -1,0 +1,36 @@
+name: Windows preview download
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'windows/tests/driver-consent.ps1'
+      - 'windows/tests/install.ps1'
+      - '.github/workflows/test-download.yml'
+permissions:
+  contents: read
+concurrency:
+  group: windows-preview-test-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  install-download:
+    runs-on: windows-2022
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Download the pinned website candidate
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $name='Phone-as-a-Second-Monitor-Windows-x64-Setup.exe'
+          curl.exe --fail --silent --show-error "https://phone-as-monitor-mcode--windows-x64-8f44dbj9.web.app/$name" -o "dist/$name"
+          if ($LASTEXITCODE -or (Get-FileHash "dist/$name").Hash -ne '6BF46A33DF9C6878A1C5CC1B6BFC2CBCCA22F9C6C7148049B614A4BA9497E3B9') {throw 'Website download does not match this preview.'}
+      - name: Install and pair the downloaded Windows app
+        shell: powershell
+        env:
+          PASM_TEST_DESKTOP: '1'
+          PASM_RUNNER_KIND: ${{ runner.environment }}
+        run: |
+          try { ./windows/tests/install.ps1 } catch { Write-Host "::error::$($_.Exception.Message)"; throw }
