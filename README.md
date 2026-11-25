@@ -2,6 +2,10 @@
 
 A Windows x64 host for Android and iOS browsers. Both devices use the same private network. Start the app from the Start menu, scan the QR code and approve the device on the PC. Touch and keyboard control are opt-in. The app remains available in the notification area after closing its window. Choose Quit there to stop it completely.
 
+The current x64 preview is available on the [product website](https://phoneasasecondmonitor.app/#downloads). [Download the Windows installer](https://phoneasasecondmonitor.app/downloads/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe) or read the [Windows setup guide](https://phoneasasecondmonitor.app/support.html#windows).
+
+The public website sources are in `web/`. The Mac ZIP and Windows installer are distributed as release files under `/downloads/` on Firebase Hosting.
+
 ## Build the website installer
 
 Use Windows 10 22H2 or Windows 11 x64, Node 22+, Python 3.11+, NSIS 3 and the .NET Framework 4.8 Developer Pack. Run from the repository root:

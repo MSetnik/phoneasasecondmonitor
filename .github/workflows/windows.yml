@@ -9,6 +9,7 @@ on:
       - 'windows/tests/display.cjs'
       - '.github/workflows/test-download.yml'
       - 'README.md'
+      - 'web/**'
       - 'windows/website/**'
       - 'windows/scripts/stage-preview.py'
       - 'firebase.windows-preview.json'
