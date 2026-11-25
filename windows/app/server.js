@@ -31,7 +31,7 @@ class Sharing {
   }
   tick(){
     this.failures=this.failures.filter(t=>Date.now()-t<60000);
-    if(this.peer && (this.remaining()===0 || Date.now()-this.peer.seen>30000 || (!this.peer.approved && Date.now()-this.peer.created>90000)))this.reset();
+    if(this.peer && (this.remaining()===0 || (!this.peer.repairing && Date.now()-this.peer.seen>30000) || (!this.peer.approved && Date.now()-this.peer.created>90000)))this.reset();
   }
   async approve(touch){
     const p=this.peer;if(!p||p.approved||this.remaining()===0)return;

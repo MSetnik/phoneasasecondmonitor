@@ -1,0 +1,59 @@
+{
+  "hosting": {
+    "public": "web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "premium-audit.json",
+      "assets/desk-scene.webp",
+      "assets/Bricolage*",
+      "assets/wordmark.svg",
+      "assets/iap-unlock.webp"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/license",
+        "function": {
+          "functionId": "displayLicense",
+          "region": "europe-west1"
+        }
+      },
+      {
+        "source": "/api/stripe",
+        "function": {
+          "functionId": "displayWebhook",
+          "region": "europe-west1"
+        }
+      }
+    ],
+    "headers": [
+      {
+        "source": "/downloads/**",
+        "headers": [
+          {
+            "key": "Content-Disposition",
+            "value": "attachment"
+          }
+        ]
+      },
+      {
+        "source": "/downloads/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-store"
+          }
+        ]
+      }
+    ],
+    "redirects": [
+      {
+        "source": "/downloads/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe",
+        "destination": "https://storage.googleapis.com/phone-as-monitor-mcode-downloads/windows/x64/00b3bcbf807993c4793d781fc77a1a0403a75cac821098890c50cedf8a216ef9/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe",
+        "type": 302
+      }
+    ],
+    "site": "phone-as-monitor-mcode"
+  }
+}

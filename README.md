@@ -4,7 +4,7 @@ A Windows x64 host for Android and iOS browsers. Both devices use the same priva
 
 The current x64 preview is available on the [product website](https://phoneasasecondmonitor.app/#downloads). [Download the Windows installer](https://phoneasasecondmonitor.app/downloads/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe) or read the [Windows setup guide](https://phoneasasecondmonitor.app/support.html#windows).
 
-The public website sources are in `web/`. The Mac ZIP and Windows installer are distributed as release files under `/downloads/` on Firebase Hosting.
+The public website sources are in `web/`. The stable `/downloads/` Windows link uses a temporary Firebase Hosting redirect to an immutable SHA-256-versioned Cloud Storage object in `phone-as-monitor-mcode-downloads`. Upload the installer as an attachment with `public,max-age=31536000,immutable,no-transform` and verify its SHA-256 before updating the destination in the live Hosting configuration and `firebase.web.json`. The Mac ZIP remains on Firebase Hosting.
 
 ## Build the website installer
 
@@ -17,7 +17,7 @@ node --test windows/tests/*.test.js
 
 The installer is written to `dist/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe`. Setup requires administrator approval to stage the pinned MIT-licensed VirtualDrivers user-mode driver and register the product's display adapter. The interactive app runs as the signed-in user. A private-network, local-subnet firewall rule allows the phone to connect. The signing identity on the upstream driver catalog belongs to SignPath Foundation. The installer has a separate publisher signature when signed by the distributor.
 
-The host attaches only its own adapter and checks that Windows has extended the desktop before capture. If the OS has duplicated the screens, use Settings → System → Display → Extend. Resolution is selected from the driver's advertised modes, including portrait and Fold modes. Refresh targets depend on the monitor, receiver, Wi-Fi and video encoder. The viewer supports WebRTC video and encrypted keyboard control, with a JPEG fallback. Password fields require a WebRTC data channel. Disconnecting releases the display, keyboard lease and any active drag.
+The host attaches only its own adapter and checks that Windows has extended the desktop before capture. If Windows does not enumerate a monitor, choose **Repair display driver** in the app and approve the Windows prompt to restart its virtual adapter. **Copy display diagnostics** reports whether Windows sees a monitor and an independent path. If Windows shows two duplicated screens, use Settings → System → Display → Extend. Resolution is selected from the driver's advertised modes, including portrait and Fold modes. Refresh targets depend on the monitor, receiver, Wi-Fi and video encoder. The viewer supports WebRTC video and encrypted keyboard control, with a JPEG fallback. Password fields require a WebRTC data channel. Disconnecting releases the display, keyboard lease and any active drag.
 
 ## Billing and distribution
 

@@ -1,1 +1,1 @@
-{"name":"phone-as-a-second-monitor","version":"1.0.0","private":true,"main":"main.js","dependencies":{"qrcode":"1.5.4"}}
+{"name":"phone-as-a-second-monitor","version":"1.0.1","private":true,"main":"main.js","dependencies":{"qrcode":"1.5.4"}}

@@ -16,7 +16,7 @@ function show(){if(ui){ui.show();ui.focus();}}
 function save(){fs.writeFileSync(prefs+'.tmp',JSON.stringify(settings));fs.renameSync(prefs+'.tmp',prefs);}
 function networks(){return [...new Set(Object.values(os.networkInterfaces()).flat().filter(n=>n && n.family==='IPv4' && !n.internal && !n.address.startsWith('169.254.')).map(n=>n.address))];}
 function state(){const p=server?.peer;return {ready:!!address,ips:networks(),address,qr,code:server?.code,phase:p?.error?'failed':p?.delivered?'live':p?.approved?'preparing':p?'approval':'pairing',ip:p?.ip,
-  touch:!!p?.grant,left:license?.remaining(),notice:p?.error||notice,port:settings?.port};}
+  repairing:!!p?.repairing,touch:!!p?.grant,left:license?.remaining(),notice:p?.error||notice,port:settings?.port};}
 function changed(){
   if(!ui||ui.isDestroyed())return;
   const peer=server?.peer;
@@ -124,6 +124,27 @@ async function start(){
         case 'check':await checkPurchase();break;
         case 'restore':await checkPurchase(String(value));break;
         case 'copy':if(license.remaining()===null){clipboard.writeText(license.data.code);notice='Recovery code copied.';}break;
+        case 'diagnostics':{
+          const details=await native.call('diagnostics');
+          clipboard.writeText('Phone as a Second Monitor '+app.getVersion()+' | OS '+os.release()+' | '+details);
+          dialog.showMessageBox(ui,{type:'info',message:'Display diagnostics copied',detail:details,buttons:['OK']}).catch(()=>{});
+          break;
+        }
+        case 'repair':{
+          const peer=server?.peer;
+          if(!peer?.error || peer.repairing)break;
+          peer.repairing=true;changed();
+          try{
+            const reboot=await native.call('repair');
+            if(server.peer===peer){
+              server.reset();
+              notice=reboot?'Restart Windows to finish repairing the driver, then pair again.':'The virtual display adapter restarted. Scan the new QR code to reconnect.';
+            }
+          }catch(error){
+            if(server.peer===peer){peer.error='Driver repair did not finish. '+error.message;}
+          }finally{peer.repairing=false;}
+          break;
+        }
         case 'display':await shell.openExternal('ms-settings:display');break;
         default:throw Error('Unknown action.');
       }
@@ -135,7 +156,7 @@ async function start(){
   tray.setContextMenu(Menu.buildFromTemplate([{label:'Open Phone as a Second Monitor',click:show},{label:'Disconnect device',click:()=>server?.reset()},{type:'separator'},{label:'Quit',click:()=>app.quit()}]));
   tray.on('click',show);
   powerMonitor.on('lock-screen',()=>server?.reset());powerMonitor.on('suspend',()=>server?.reset());
-  await native.call('detach');await listen();show();
+  await listen();show();
   license.check().then(changed).catch(()=>{});
   let ticks=0;
   setInterval(async()=>{

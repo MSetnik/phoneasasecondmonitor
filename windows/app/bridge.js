@@ -17,7 +17,7 @@ class Native {
     if(this.closed||this.pending.size>64)return Promise.reject(Error('Windows display helper is unavailable or busy.'));
     const id=++this.id;
     return new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>{this.pending.delete(id);reject(Error('Windows did not respond.'));this.process.kill();},12000);
+      const timer=setTimeout(()=>{this.pending.delete(id);reject(Error('Windows did not respond.'));this.process.kill();},op==='repair'?120000:op==='attach'?30000:12000);
       this.pending.set(id,{resolve:v=>{clearTimeout(timer);resolve(v);},reject:e=>{clearTimeout(timer);reject(e);}});
       this.process.stdin.write(JSON.stringify({id,op,...values})+'\n');
     });

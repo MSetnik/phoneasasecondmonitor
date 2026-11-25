@@ -113,10 +113,12 @@ internal static class Host {
                 try{
                     var d=json.Deserialize<Dictionary<string,object>>(line); id=(int)d["id"];
                     switch(S(d,"op")){
+                        case "repair":result=Adapter.RestartDriver(true);break;
+                        case "diagnostics":result=Adapter.Diagnostics();break;
                         case "health":Adapter.CheckDevice();result=true;break;
                         case "attach":Adapter.CheckDevice();Release();area=Adapter.Attach((int)N(d,"width",320,4096),(int)N(d,"height",320,4096),(int)N(d,"fps",30,120));result=area;break;
-                        case "check":if(dragging && (DateTime.UtcNow-lastDrag).TotalSeconds>2.5)Release();area=Adapter.Current();result=area;break;
-                        case "detach":Release();Adapter.Detach();area=null;result=true;break;
+                        case "check":if(dragging && (DateTime.UtcNow-lastDrag).TotalSeconds>2.5)Release();var activeArea=Adapter.Current();if(area!=null)area=activeArea;result=activeArea;break;
+                        case "detach":Release();if(area!=null)Adapter.Detach();area=null;result=true;break;
                         case "release":Release();result=true;break;
                         case "input":result=Input((Dictionary<string,object>)d["body"],S(d,"kind")=="keyboard",d.ContainsKey("encrypted") && (bool)d["encrypted"]);break;
                         default:throw new Exception("Unknown operation.");
@@ -124,7 +126,7 @@ internal static class Host {
                     output.WriteLine(json.Serialize(new{id=id,result=result}));
                 }catch(Exception e){output.WriteLine(json.Serialize(new{id=id,error=e.Message}));}
             }
-            Release();Adapter.Detach();return 0;
+            Release();if(area!=null)Adapter.Detach();return 0;
         }catch(Exception e){Console.Error.WriteLine(e.Message);return 1;}
     }
 }

@@ -1,7 +1,9 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
-using Microsoft.Win32;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
 
 internal static class Adapter {
     internal const string Instance = @"ROOT\MCODEPASM\0000";
@@ -16,6 +18,25 @@ internal static class Adapter {
     [DllImport("setupapi")] static extern bool SetupDiDestroyDeviceInfoList(IntPtr list);
     [DllImport("cfgmgr32",CharSet=CharSet.Unicode)] static extern int CM_Locate_DevNodeW(out uint device,string instance,uint flags);
     [DllImport("cfgmgr32")] static extern int CM_Get_DevNode_Status(out uint status,out uint problem,uint device,uint flags);
+    [DllImport("cfgmgr32")] static extern int CM_Get_Parent(out uint parent,uint device,uint flags);
+    [DllImport("cfgmgr32")] static extern int CM_Get_Child(out uint child,uint device,uint flags);
+    static bool HasChild() {
+        uint device, child;
+        return CM_Locate_DevNodeW(out device,Instance,0)==0 && CM_Get_Child(out child,device,0)==0;
+    }
+    internal static bool RestartDriver(bool requestApproval) {
+        var command = new ProcessStartInfo(System.IO.Path.Combine(Environment.SystemDirectory,"pnputil.exe"),
+            "/restart-device \"" + Instance + "\"");
+        command.UseShellExecute=requestApproval;
+        command.WindowStyle=ProcessWindowStyle.Hidden;
+        if(requestApproval)command.Verb="runas";
+        using(var process=Process.Start(command)){
+            if(!process.WaitForExit(25000))throw new Exception("The adapter is still restarting. Wait a moment and pair again.");
+            if(process.ExitCode==3010)return true;
+            if(process.ExitCode!=0)throw new Exception("Windows could not restart the app’s display adapter (code "+process.ExitCode+"). Run the installer again.");
+        }
+        return false;
+    }
     internal static void CheckDevice() {
         uint device,status,problem;
         if(CM_Locate_DevNodeW(out device,Instance,0)!=0)
@@ -72,13 +93,19 @@ internal static class Adapter {
                 if (exists && !SetupDiCallClassInstaller(5,list,ref device)) throw new System.ComponentModel.Win32Exception();
                 return false;
             }
-            if(!exists){
-            byte[] ids = Encoding.Unicode.GetBytes("MttVDD\0\0");
-            if (!SetupDiCreateDeviceInfo(list,Instance,ref display,"Phone as a Second Monitor",IntPtr.Zero,0,ref device)
-                || !SetupDiSetDeviceRegistryProperty(list,ref device,1,ids,ids.Length)
-                || !SetupDiCallClassInstaller(0x19,list,ref device)) throw new System.ComponentModel.Win32Exception();
+            if(!exists && !SetupDiCreateDeviceInfo(list,Instance,ref display,"Phone as a Second Monitor",IntPtr.Zero,0,ref device))
+                throw new System.ComponentModel.Win32Exception();
+            // The package provides a root-enumerated HWID and a software-device HWID.
+            // Keep the product-specific instance ID when upgrading an existing installation.
+            byte[] ids=Encoding.Unicode.GetBytes("Root\\MttVDD\0MttVDD\0\0");
+            if(!SetupDiSetDeviceRegistryProperty(list,ref device,1,ids,ids.Length) ||
+                (!exists && !SetupDiCallClassInstaller(0x19,list,ref device)))throw new System.ComponentModel.Win32Exception();
+            bool reboot=BindPackage(list,ref device);
+            if(!reboot){
+                for(int i=0;i<8 && !HasChild();i++)Thread.Sleep(250);
+                if(!HasChild())reboot=RestartDriver(false);
             }
-            return BindPackage(list,ref device);
+            return reboot;
         } finally { SetupDiDestroyDeviceInfoList(list); }
     }
 
@@ -96,71 +123,176 @@ internal static class Adapter {
         return DisplayConfigGetDeviceInfo(ref query)==0 ? query.name : "";
     }
     [DllImport("user32")] static extern int SetDisplayConfig(int count,byte[] paths,int modes,byte[] modeData,uint flags);
+    [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]
+    struct TargetName {
+        public int type,size,low,high,id,flags,technology;
+        public ushort manufacturer,product; public int connector;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=64)] public string friendly;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=128)] public string path;
+    }
+    [DllImport("user32",EntryPoint="DisplayConfigGetDeviceInfo")] static extern int GetTargetName(ref TargetName info);
+    [StructLayout(LayoutKind.Sequential)] struct InterfaceData {
+        public int size; public Guid cls; public uint flags; public IntPtr reserved;
+    }
+    [DllImport("setupapi",EntryPoint="SetupDiCreateDeviceInfoList")] static extern IntPtr NewDeviceList(IntPtr cls,IntPtr parent);
+    [DllImport("setupapi",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool SetupDiOpenDeviceInterface(IntPtr list,string path,uint flags,ref InterfaceData entry);
+    [DllImport("setupapi",CharSet=CharSet.Unicode,SetLastError=true)] static extern bool SetupDiGetDeviceInterfaceDetail(IntPtr list,ref InterfaceData entry,IntPtr detail,int length,out int needed,ref Device device);
+    static bool OwnedInterface(string path) {
+        if(String.IsNullOrEmpty(path))return false;
+        uint owner;
+        if(CM_Locate_DevNodeW(out owner,Instance,0)!=0)return false;
+        var list=NewDeviceList(IntPtr.Zero,IntPtr.Zero);
+        if(list==new IntPtr(-1))return false;
+        try{
+            var entry=new InterfaceData{size=Marshal.SizeOf(typeof(InterfaceData))};
+            if(!SetupDiOpenDeviceInterface(list,path,0,ref entry))return false;
+            var device=new Device{size=Marshal.SizeOf(typeof(Device))};
+            int needed;
+            // The sizing call also fills DeviceInfoData with the interface's devnode.
+            if(!SetupDiGetDeviceInterfaceDetail(list,ref entry,IntPtr.Zero,0,out needed,ref device) && Marshal.GetLastWin32Error()!=122)return false;
+            uint node=(uint)device.dev;
+            while(node!=0){
+                if(node==owner)return true;
+                uint parent;
+                if(CM_Get_Parent(out parent,node,0)!=0 || parent==node)break;
+                node=parent;
+            }
+            return false;
+        }finally{SetupDiDestroyDeviceInfoList(list);}
+    }
     static bool OwnsTarget(byte[] paths,int row) {
-        return ReadName(paths,row+20,4).IndexOf("#MCODEPASM#0000#",StringComparison.OrdinalIgnoreCase)>=0;
+        if(ReadName(paths,row+20,4).IndexOf("#MCODEPASM#0000#",StringComparison.OrdinalIgnoreCase)>=0)return true;
+        // Hybrid graphics can report a render adapter here. Resolve the monitor itself, too.
+        var target=new TargetName{type=2,size=Marshal.SizeOf(typeof(TargetName)),
+            low=Field(paths,row+20),high=Field(paths,row+24),id=Field(paths,row+28)};
+        return GetTargetName(ref target)==0 && OwnedInterface(target.path);
     }
-    static bool SameSource(byte[] paths,int a,int b) {
-        return BitConverter.ToInt64(paths,a)==BitConverter.ToInt64(paths,b) &&
-               BitConverter.ToInt32(paths,a+8)==BitConverter.ToInt32(paths,b+8);
+    static bool SameEndpoint(byte[] paths,int a,int b) {
+        return BitConverter.ToInt64(paths,a)==BitConverter.ToInt64(paths,b) && Field(paths,a+8)==Field(paths,b+8);
     }
-    static string EnableOwnPath(){
-        int last=0;
-        for(int attempt=0;attempt<3;attempt++){
-            int count,modeCount;
-            last=GetDisplayConfigBufferSizes(1,out count,out modeCount);if(last!=0)break;
-            var paths=new byte[count*72];var modes=new byte[modeCount*64];
-            last=QueryDisplayConfig(1,ref count,paths,ref modeCount,modes,IntPtr.Zero);
-            if(last==122)continue;
-            if(last!=0)break;
-            var active=new System.Collections.Generic.List<int>();
-            for(int i=0;i<count;i++)if((Field(paths,i*72+68)&1)!=0)active.Add(i*72);
-            for(int i=0;i<count;i++){
-                var candidate=i*72;
-                if(!OwnsTarget(paths,candidate) || Field(paths,candidate+60)==0 || active.Contains(candidate))continue;
-                if(active.Exists(row=>SameSource(paths,row,candidate)))continue;
-                // Preserve all active paths and modes. Windows chooses a mode
-                // for the new, distinct source before GDI enumerates its modes.
-                var selected=new byte[(active.Count+1)*72];int offset=0;
-                foreach(var row in active){Buffer.BlockCopy(paths,row,selected,offset,72);offset+=72;}
-                Buffer.BlockCopy(paths,candidate,selected,offset,72);
-                Set(selected,offset+12,-1);Set(selected,offset+32,-1);Set(selected,offset+68,1);
-                const uint config=0x20|0x400;
-                last=SetDisplayConfig(active.Count+1,selected,modeCount,modes,config|0x40);
-                if(last!=0)continue;
-                last=SetDisplayConfig(active.Count+1,selected,modeCount,modes,config|0x80|0x200);
-                if(last!=0)continue;
-                for(int retry=0;retry<15;retry++){
-                    var name=Source(true);if(!String.IsNullOrEmpty(name))return name;
-                    System.Threading.Thread.Sleep(100);
-                }
-            }
-            break;
+    static int ReadPaths(uint flags,out byte[] paths,out int count,out byte[] modes,out int modeCount) {
+        paths=modes=null; count=modeCount=0;
+        int status=122;
+        for(int i=0;i<3 && status==122;i++){
+            status=GetDisplayConfigBufferSizes(flags,out count,out modeCount);
+            if(status!=0)continue;
+            paths=new byte[count*72];modes=new byte[modeCount*64];
+            status=QueryDisplayConfig(flags,ref count,paths,ref modeCount,modes,IntPtr.Zero);
         }
-        throw new Exception("Windows could not activate a separate display path (code "+last+"). Open Display settings and choose Extend.");
+        return status;
     }
-    internal static string Source(bool requireActive) {
-        for(int attempt=0;attempt<3;attempt++){
-            int n,m; uint flags=requireActive?2u:1u;
-            if(GetDisplayConfigBufferSizes(flags,out n,out m)!=0) break;
-            byte[] p=new byte[n*72], modes=new byte[m*64];
-            int result=QueryDisplayConfig(flags,ref n,p,ref m,modes,IntPtr.Zero);
-            if(result==122) continue;
-            if(result!=0) break;
-            for(int i=0;i<n;i++){
-                int row=i*72;
-                if(!OwnsTarget(p,row)) continue;
-                string name=ReadName(p,row,1);
-                if(string.IsNullOrEmpty(name)) continue;
-                bool shared=false;
-                for(int j=0;j<n;j++){
-                    int other=j*72;
-                    if(i!=j && (BitConverter.ToInt32(p,other+68)&1)!=0 && ReadName(p,other,1)==name) shared=true;
-                }
-                if(!shared) return name;
+    [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]
+    struct DisplayDevice {
+        public int size;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)] public string name;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=128)] public string description;
+        public int flags;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=128)] public string id;
+        [MarshalAs(UnmanagedType.ByValTStr,SizeConst=128)] public string key;
+    }
+    [DllImport("user32",CharSet=CharSet.Unicode)] static extern bool EnumDisplayDevices(string name,int index,ref DisplayDevice device,int flags);
+    static string GdiSource(bool attached) {
+        var adapter=new DisplayDevice{size=Marshal.SizeOf(typeof(DisplayDevice))};
+        for(int ai=0;EnumDisplayDevices(null,ai,ref adapter,0);ai++){
+            if(((adapter.flags&1)!=0)!=attached || (adapter.flags&12)!=0)continue; // primary or mirroring driver
+            var monitor=new DisplayDevice{size=adapter.size};
+            bool owned=String.Equals(adapter.id,Instance,StringComparison.OrdinalIgnoreCase), foreign=false;
+            for(int mi=0;EnumDisplayDevices(adapter.name,mi,ref monitor,1);mi++){
+                if(OwnedInterface(monitor.id))owned=true;
+                else if((monitor.flags&1)!=0)foreign=true;
             }
-            break;
+            if(owned && !foreign)return adapter.name;
         }
         return null;
+    }
+    static string WaitForSource(){
+        for(int i=0;i<10;i++){
+            var name=Source(true);
+            if(name!=null)return name;
+            Thread.Sleep(150);
+        }
+        return null;
+    }
+    static string EnableOwnPath(){
+        bool sawTarget=false, applied=false;
+        int lastError=0;
+        var wait=Stopwatch.StartNew();
+        do{
+            string existing=Source(true);
+            if(existing!=null)return existing;
+            byte[] paths,modes;int count,modeCount;
+            int status=ReadPaths(1,out paths,out count,out modes,out modeCount);
+            if(status!=0)throw new Exception("Windows could not list display paths (code "+status+"). Try again from the laptop’s local desktop.");
+            var active=new List<int>();
+            for(int i=0;i<count;i++)if((Field(paths,i*72+68)&1)!=0)active.Add(i*72);
+            for(int i=0;i<count;i++){
+                int row=i*72;
+                if(Field(paths,row+60)==0 || !OwnsTarget(paths,row))continue;
+                sawTarget=true;
+                if(active.Contains(row))continue;
+                // Replace this target's cloned path, preserving every other active monitor.
+                var keep=active.FindAll(a=>!SameEndpoint(paths,a+20,row+20));
+                if(keep.Exists(a=>SameEndpoint(paths,a,row)))continue;
+                int offset=keep.Count*72;
+                var selected=new byte[offset+72];
+                for(int k=0;k<keep.Count;k++)Buffer.BlockCopy(paths,keep[k],selected,k*72,72);
+                Buffer.BlockCopy(paths,row,selected,offset,72);
+                Set(selected,offset+12,-1);Set(selected,offset+32,-1);Set(selected,offset+68,1);
+                const uint supplied=0x20|0x400;
+                status=SetDisplayConfig(keep.Count+1,selected,modeCount,modes,supplied|0x40);
+                if(status==0)status=SetDisplayConfig(keep.Count+1,selected,modeCount,modes,supplied|0x80);
+                if(status!=0){lastError=status;continue;}
+                applied=true;
+                var name=WaitForSource();if(name!=null)return name;
+                break;
+            }
+            // Detached GDI displays can acquire a desktop source before CCD lists an available path.
+            string detached=GdiSource(false);
+            if(detached!=null){
+                sawTarget=true;
+                var mode=Mode(detached,-2);
+                if(mode==null || Field(mode,172)==0 || Field(mode,176)==0)mode=Mode(detached,0);
+                if(mode!=null){
+                    int right=0;foreach(var screen in System.Windows.Forms.Screen.AllScreens)right=Math.Max(right,screen.Bounds.Right);
+                    Set(mode,72,0x180020);Set(mode,76,right);Set(mode,80,0);
+                    int change=ChangeDisplaySettingsEx(detached,mode,IntPtr.Zero,2,IntPtr.Zero);
+                    if(change==0)change=ChangeDisplaySettingsEx(detached,mode,IntPtr.Zero,0,IntPtr.Zero);
+                    if(change==0){applied=true;var name=WaitForSource();if(name!=null)return name;}
+                    else lastError=change;
+                }
+            }
+            if(sawTarget)break;
+            Thread.Sleep(300);
+        }while(wait.ElapsedMilliseconds<5000);
+        if(!sawTarget && !HasChild())throw new Exception("The virtual display driver is installed, but Windows has not detected its monitor. Choose Repair display driver.");
+        if(applied)throw new Exception("Windows accepted the display change, but the virtual monitor did not become active. Choose Repair display driver.");
+        if(lastError!=0)throw new Exception("Windows rejected the virtual display configuration (code "+lastError+"). Choose Repair display driver.");
+        throw new Exception("Windows has not exposed an independent desktop for the virtual monitor. Choose Repair display driver.");
+    }
+    internal static string Source(bool requireActive) {
+        byte[] paths,modes;int count,modeCount;
+        bool cloned=false;
+        if(ReadPaths(requireActive?2u:1u,out paths,out count,out modes,out modeCount)==0){
+            for(int i=0;i<count;i++){
+                int row=i*72;
+                if(!OwnsTarget(paths,row))continue;
+                bool shared=false;
+                for(int j=0;j<count;j++)if(j!=i && (Field(paths,j*72+68)&1)!=0 && SameEndpoint(paths,row,j*72))shared=true;
+                if(shared){cloned=true;continue;}
+                var name=ReadName(paths,row,1);if(!String.IsNullOrEmpty(name))return name;
+            }
+        }
+        return cloned?null:GdiSource(requireActive);
+    }
+    internal static string Diagnostics() {
+        byte[] paths,modes;int count,modeCount;
+        int result=ReadPaths(1,out paths,out count,out modes,out modeCount), own=0,available=0,active=0;
+        if(result==0)for(int i=0;i<count;i++)if(OwnsTarget(paths,i*72)){
+            own++;if(Field(paths,i*72+60)!=0)available++;if((Field(paths,i*72+68)&1)!=0)active++;
+        }
+        return "Adapter child: "+HasChild()+"; display query: "+result+
+            "; paths: "+count+"; app paths: "+own+"; available: "+available+"; active: "+active+
+            "; desktop source: "+(Source(true)??"none");
     }
     [DllImport("user32",CharSet=CharSet.Unicode)] static extern bool EnumDisplaySettings(string name,int mode,[In,Out]byte[] settings);
     [DllImport("user32",CharSet=CharSet.Unicode)] static extern int ChangeDisplaySettingsEx(string name,byte[] settings,IntPtr hwnd,uint flags,IntPtr param);
@@ -202,7 +334,10 @@ internal static class Adapter {
             foreach(var s in System.Windows.Forms.Screen.AllScreens) x=Math.Max(x,s.Bounds.Right);
         }
         Set(best,72,0x180020|0x400000); Set(best,76,x);Set(best,80,y);
-        if(ChangeDisplaySettingsEx(name,best,IntPtr.Zero,1,IntPtr.Zero)!=0) throw new Exception("Windows could not extend the desktop. Open Display settings and select Extend.");
+        if(ChangeDisplaySettingsEx(name,best,IntPtr.Zero,0,IntPtr.Zero)!=0){
+            if(current!=null)return current;
+            throw new Exception("Windows could not set a resolution for the virtual monitor.");
+        }
         var area=Current();
         if(area==null) throw new Exception("Windows has not activated the separate display.");
         return area;
@@ -211,6 +346,6 @@ internal static class Adapter {
         var a=Current(); if(a==null)return;
         var m=Mode(a.name,-1); if(m==null)return;
         Set(m,72,0x180020); Set(m,172,0); Set(m,176,0);
-        ChangeDisplaySettingsEx(a.name,m,IntPtr.Zero,1,IntPtr.Zero);
+        ChangeDisplaySettingsEx(a.name,m,IntPtr.Zero,0,IntPtr.Zero);
     }
 }
