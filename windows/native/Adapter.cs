@@ -4,6 +4,8 @@ using System.Text;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using System.IO;
+using Microsoft.Win32;
 
 internal static class Adapter {
     internal const string Instance = @"ROOT\MCODEPASM\0000";
@@ -83,6 +85,43 @@ internal static class Adapter {
             return reboot;
         }finally{SetupDiDestroyDriverInfoList(list,ref device,2);}
     }
+    const string SettingsKey=@"SOFTWARE\MikeTheTech\VirtualDisplayDriver";
+    static readonly string DriverDir=Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,@"..\driver"));
+    static readonly string ServiceSettings=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+        @"ServiceProfiles\LocalService\AppData\Local\MCODE-PhoneAsMonitor");
+    static bool AppSettings(string path) {
+        return String.Equals(path,DriverDir,StringComparison.OrdinalIgnoreCase) ||
+            String.Equals(path,ServiceSettings,StringComparison.OrdinalIgnoreCase);
+    }
+    static bool ConfigureSettings(bool stock) {
+        using(var key=Registry.LocalMachine.CreateSubKey(SettingsKey)){
+            string current=key.GetValue("VDDPATH") as string;
+            if(String.IsNullOrEmpty(current)){
+                if(Directory.Exists(@"C:\VirtualDisplayDriver"))return false;
+            }else if(!AppSettings(current))return false;
+            Directory.CreateDirectory(ServiceSettings);
+            File.Copy(Path.Combine(DriverDir,stock?"vdd_defaults.xml":"vdd_settings.xml"),
+                Path.Combine(ServiceSettings,"vdd_settings.xml"),true);
+            key.SetValue("VDDPATH",ServiceSettings);
+            return true;
+        }
+    }
+    static void RemoveSettings() {
+        using(var key=Registry.LocalMachine.OpenSubKey(SettingsKey,true)){
+            if(key!=null && AppSettings(key.GetValue("VDDPATH") as string))key.DeleteValue("VDDPATH",false);
+        }
+        var settings=Path.Combine(ServiceSettings,"vdd_settings.xml");
+        if(File.Exists(settings))File.Delete(settings);
+        if(Directory.Exists(ServiceSettings) && Directory.GetFileSystemEntries(ServiceSettings).Length==0)
+            Directory.Delete(ServiceSettings);
+    }
+    static bool WaitForMonitor() {
+        for(int i=0;i<20;i++){
+            if(HasChild())return true;
+            Thread.Sleep(250);
+        }
+        return HasChild();
+    }
     internal static bool Install(bool remove) {
         IntPtr list = SetupDiCreateDeviceInfoList(ref display, IntPtr.Zero);
         if (list == new IntPtr(-1)) throw new System.ComponentModel.Win32Exception();
@@ -91,8 +130,10 @@ internal static class Adapter {
             bool exists = SetupDiOpenDeviceInfo(list,Instance,IntPtr.Zero,0,ref device);
             if (remove) {
                 if (exists && !SetupDiCallClassInstaller(5,list,ref device)) throw new System.ComponentModel.Win32Exception();
+                RemoveSettings();
                 return false;
             }
+            bool managed=ConfigureSettings(false);
             if(!exists && !SetupDiCreateDeviceInfo(list,Instance,ref display,"Phone as a Second Monitor",IntPtr.Zero,0,ref device))
                 throw new System.ComponentModel.Win32Exception();
             // The package provides a root-enumerated HWID and a software-device HWID.
@@ -101,9 +142,12 @@ internal static class Adapter {
             if(!SetupDiSetDeviceRegistryProperty(list,ref device,1,ids,ids.Length) ||
                 (!exists && !SetupDiCallClassInstaller(0x19,list,ref device)))throw new System.ComponentModel.Win32Exception();
             bool reboot=BindPackage(list,ref device);
-            if(!reboot){
-                for(int i=0;i<8 && !HasChild();i++)Thread.Sleep(250);
-                if(!HasChild())reboot=RestartDriver(false);
+            if(!reboot && !WaitForMonitor()){
+                reboot=RestartDriver(false);
+                if(!reboot && !WaitForMonitor() && managed){
+                    ConfigureSettings(true);
+                    reboot=RestartDriver(false);
+                }
             }
             return reboot;
         } finally { SetupDiDestroyDeviceInfoList(list); }
