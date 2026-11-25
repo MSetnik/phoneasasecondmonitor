@@ -3,12 +3,12 @@ Unicode true
 !include "x64.nsh"
 !include "LogicLib.nsh"
 Name "Phone as a Second Monitor"
-OutFile "../../dist/Phone-as-a-Second-Monitor-Windows-x64-Setup.exe"
+OutFile "..\..\dist\Phone-as-a-Second-Monitor-Windows-x64-Setup.exe"
 InstallDir "$PROGRAMFILES64\MCODE\Phone as a Second Monitor"
 RequestExecutionLevel admin
 SetCompressor /SOLID lzma
-Icon "../../out/monitor.ico"
-UninstallIcon "../../out/monitor.ico"
+Icon "..\..\out\monitor.ico"
+UninstallIcon "..\..\out\monitor.ico"
 ShowInstDetails show
 VIProductVersion "1.0.0.0"
 VIAddVersionKey /LANG=1033 "ProductName" "Phone as a Second Monitor"
@@ -35,7 +35,7 @@ Section
   SetRegView 64
   SetShellVarContext all
   SetOutPath "$INSTDIR"
-  File /r "../../out/product/*"
+  File /r "..\..\out\product\*.*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKLM "${APPKEY}" "DisplayName" "Phone as a Second Monitor"
   WriteRegStr HKLM "${APPKEY}" "Publisher" "MCODE"
@@ -89,7 +89,7 @@ Section "Uninstall"
   ${EndIf}
   Delete "$SMPROGRAMS\Phone as a Second Monitor.lnk"
   DeleteRegKey HKLM "${APPKEY}"
-  !include "../../out/uninstall-files.nsh"
+  !include "..\..\out\uninstall-files.nsh"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
 SectionEnd

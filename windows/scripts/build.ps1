@@ -16,6 +16,9 @@ $sig=Get-AuthenticodeSignature out/product/driver/mttvdd.cat
 if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notlike '*SignPath Foundation*') { throw "Driver signature verification failed: $($sig.Status)" }
 $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
 if (!(Test-Path $nsis)) { throw 'Install NSIS 3.x first.' }
-& $nsis /V2 windows/installer/setup.nsi
-if ($LASTEXITCODE) { throw 'Installer build failed.' }
+Push-Location windows/installer
+try {
+  $lines = & $nsis /V3 setup.nsi 2>&1
+  if ($LASTEXITCODE) { throw ("NSIS: " + (($lines | Select-Object -Last 8) -join " / ")) }
+} finally { Pop-Location }
 Get-FileHash dist/*.exe
