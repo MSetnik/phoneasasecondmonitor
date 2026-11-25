@@ -45,7 +45,7 @@ Section
   WriteRegStr HKLM "${APPKEY}" "DisplayIcon" "$INSTDIR\monitor.ico"
   ReadRegStr $1 HKLM "${VDDKEY}" "VDDPATH"
   ${If} $1 == ""
-  ${AndIfNot} ${FileExists} "C:\VirtualDisplayDriver\vdd_settings.xml"
+  ${AndIfNot} ${FileExists} "C:\VirtualDisplayDriver\*.*"
     WriteRegStr HKLM "${VDDKEY}" "VDDPATH" "$INSTDIR\driver"
   ${EndIf}
   ${DisableX64FSRedirection}

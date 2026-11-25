@@ -74,7 +74,7 @@ async function listen(rotate=false,ip=settings.ip){
     server?.close();address='';qr='';notice='';
     await native.call('health');
     const ips=networks();if(!ips.includes(ip))ip=ips[0];if(!ip)throw Error('Connect this PC to the same local network as your phone, then retry.');
-    server=new Sharing({remaining:()=>license.remaining(),changed,startMedia,stopMedia,media,sendInput:input=>native.call('input',input)});
+    server=new Sharing({remaining:()=>license.remaining(),changed,startMedia,stopMedia,media,onFailure:message=>{notice=message;},sendInput:input=>native.call('input',input)});
     await server.listen(ip,rotate?0:settings.port||0,viewer);
     settings.ip=ip;settings.port=server.server.address().port;save();address=server.address;
   }catch(e){notice=e.code==='EADDRINUSE'?'The saved port is busy. Choose another port below.':e.message;}finally{opening=false;changed();}

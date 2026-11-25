@@ -95,6 +95,49 @@ internal static class Adapter {
             high=BitConverter.ToInt32(paths,offset+4),id=type==4?0:BitConverter.ToInt32(paths,offset+8)};
         return DisplayConfigGetDeviceInfo(ref query)==0 ? query.name : "";
     }
+    [DllImport("user32")] static extern int SetDisplayConfig(int count,byte[] paths,int modes,byte[] modeData,uint flags);
+    static bool OwnsTarget(byte[] paths,int row) {
+        return ReadName(paths,row+20,4).IndexOf("#MCODEPASM#0000#",StringComparison.OrdinalIgnoreCase)>=0;
+    }
+    static bool SameSource(byte[] paths,int a,int b) {
+        return BitConverter.ToInt64(paths,a)==BitConverter.ToInt64(paths,b) &&
+               BitConverter.ToInt32(paths,a+8)==BitConverter.ToInt32(paths,b+8);
+    }
+    static string EnableOwnPath(){
+        int last=0;
+        for(int attempt=0;attempt<3;attempt++){
+            int count,modeCount;
+            last=GetDisplayConfigBufferSizes(1,out count,out modeCount);if(last!=0)break;
+            var paths=new byte[count*72];var modes=new byte[modeCount*64];
+            last=QueryDisplayConfig(1,ref count,paths,ref modeCount,modes,IntPtr.Zero);
+            if(last==122)continue;
+            if(last!=0)break;
+            var active=new System.Collections.Generic.List<int>();
+            for(int i=0;i<count;i++)if((Field(paths,i*72+68)&1)!=0)active.Add(i*72);
+            for(int i=0;i<count;i++){
+                var candidate=i*72;
+                if(!OwnsTarget(paths,candidate) || Field(paths,candidate+60)==0 || active.Contains(candidate))continue;
+                if(active.Exists(row=>SameSource(paths,row,candidate)))continue;
+                // Preserve all active paths and modes. Windows chooses a mode
+                // for the new, distinct source before GDI enumerates its modes.
+                var selected=new byte[(active.Count+1)*72];int offset=0;
+                foreach(var row in active){Buffer.BlockCopy(paths,row,selected,offset,72);offset+=72;}
+                Buffer.BlockCopy(paths,candidate,selected,offset,72);
+                Set(selected,offset+12,-1);Set(selected,offset+32,-1);Set(selected,offset+68,1);
+                const uint config=0x20|0x400;
+                last=SetDisplayConfig(active.Count+1,selected,modeCount,modes,config|0x40);
+                if(last!=0)continue;
+                last=SetDisplayConfig(active.Count+1,selected,modeCount,modes,config|0x80|0x200);
+                if(last!=0)continue;
+                for(int retry=0;retry<15;retry++){
+                    var name=Source(true);if(!String.IsNullOrEmpty(name))return name;
+                    System.Threading.Thread.Sleep(100);
+                }
+            }
+            break;
+        }
+        throw new Exception("Windows could not activate a separate display path (code "+last+"). Open Display settings and choose Extend.");
+    }
     internal static string Source(bool requireActive) {
         for(int attempt=0;attempt<3;attempt++){
             int n,m; uint flags=requireActive?2u:1u;
@@ -105,7 +148,7 @@ internal static class Adapter {
             if(result!=0) break;
             for(int i=0;i<n;i++){
                 int row=i*72;
-                if(ReadName(p,row+20,4).IndexOf("#MCODEPASM#0000#",StringComparison.OrdinalIgnoreCase)<0) continue;
+                if(!OwnsTarget(p,row)) continue;
                 string name=ReadName(p,row,1);
                 if(string.IsNullOrEmpty(name)) continue;
                 bool shared=false;
@@ -135,10 +178,10 @@ internal static class Adapter {
         if(mode==null) return null;
         var s=System.Windows.Forms.Screen.PrimaryScreen;
         if(s==null || s.DeviceName==name) return null;
-        return new Area{name=name,x=Field(mode,76),y=Field(mode,80),width=Field(mode,172),height=Field(mode,176),fps=Field(mode,184)};
+        return new Area{name=name,x=Field(mode,76),y=Field(mode,80),width=Field(mode,172),height=Field(mode,176),fps=Field(mode,184)<30?60:Math.Min(120,Field(mode,184))};
     }
     internal static Area Attach(int width,int height,int fps) {
-        string name=Source(true) ?? Source(false);
+        string name=Source(true) ?? EnableOwnPath();
         if(name==null || System.Windows.Forms.Screen.PrimaryScreen.DeviceName==name)
             throw new Exception("The virtual monitor is unavailable. Choose Extend in Windows Display settings, or repair the installation.");
         var current=Current();
@@ -150,7 +193,10 @@ internal static class Adapter {
             double cost=12*Math.Abs(Math.Log((double)w*height/(h*width)))+Math.Abs(Math.Log((double)w/width))+0.004*Math.Abs(rate-fps);
             if(cost<score){best=m;score=cost;}
         }
-        if(best==null) throw new Exception("Windows reported no usable modes for the virtual monitor.");
+        if(best==null){
+            if(current!=null && current.width>=320 && current.height>=320)return current;
+            throw new Exception("Windows did not expose a usable video mode for "+name+". Check the display adapter in Device Manager.");
+        }
         int x=0,y=0;
         if(current!=null){x=current.x;y=current.y;} else {
             foreach(var s in System.Windows.Forms.Screen.AllScreens) x=Math.Max(x,s.Bounds.Right);

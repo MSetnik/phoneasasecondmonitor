@@ -104,9 +104,11 @@ internal static class Host {
         SetProcessDpiAwarenessContext(new IntPtr(-4));
         try{
             if(args.Length==1 && (args[0]=="install"||args[0]=="uninstall")){return Adapter.Install(args[0]=="uninstall")?3010:0;}
-            Console.InputEncoding=new System.Text.UTF8Encoding(false);Console.OutputEncoding=new System.Text.UTF8Encoding(false);
+            var utf8=new System.Text.UTF8Encoding(false);
+            var input=new System.IO.StreamReader(Console.OpenStandardInput(),utf8,true);
+            var output=new System.IO.StreamWriter(Console.OpenStandardOutput(),utf8){AutoFlush=true};
             string line;
-            while((line=Console.ReadLine())!=null){
+            while((line=input.ReadLine())!=null){
                 int id=0;object result;
                 try{
                     var d=json.Deserialize<Dictionary<string,object>>(line); id=(int)d["id"];
@@ -119,8 +121,8 @@ internal static class Host {
                         case "input":result=Input((Dictionary<string,object>)d["body"],S(d,"kind")=="keyboard",d.ContainsKey("encrypted") && (bool)d["encrypted"]);break;
                         default:throw new Exception("Unknown operation.");
                     }
-                    Console.WriteLine(json.Serialize(new{id=id,result=result}));
-                }catch(Exception e){Console.WriteLine(json.Serialize(new{id=id,error=e.Message}));}
+                    output.WriteLine(json.Serialize(new{id=id,result=result}));
+                }catch(Exception e){output.WriteLine(json.Serialize(new{id=id,error=e.Message}));}
             }
             Release();Adapter.Detach();return 0;
         }catch(Exception e){Console.Error.WriteLine(e.Message);return 1;}

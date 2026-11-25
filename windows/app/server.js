@@ -42,7 +42,7 @@ class Sharing {
     if(p.busy||this.peer!==p)return;
     p.size=size;p.busy=true;p.ready=false;p.delivered=false;p.offer=null;p.videoID=null;p.frame=null;
     try {const area=await this.startMedia(size,p);if(this.peer===p){p.area=area;p.ready=true;}}
-    catch(e){if(this.peer===p){p.error=e.message;this.stopMedia();}}
+    catch(e){if(this.peer===p){p.error=e.message;this.onFailure?.(e.message);this.stopMedia();}}
     finally{p.busy=false;this.changed();}
   }
   async input(p,kind,grant,body,encrypted){
